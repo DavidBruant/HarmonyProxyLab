@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+	<head>
+	    <meta charset="UTF-8">
+		
+		<style>
+		html,body{
+		    width: 100%;
+		    height: 100%;
+		    background: #EEE;
+		}
+		</style>
+		
+		<script type="text/javascript" src="LazyReadCopy.js"> </script>
+		
+		<script type="text/javascript">
+		(function(global){
+		    var o = {a:1, b:2};
+		    console.log(o.a, o.b, o.c) // 1 2 undefined
+		    // I won't manipulate o expect to create LazyReadCopies, so it should remain the same all along
+		    
+		    var o2 = LazyReadCopy(o);
+		    console.log(o2.a, o2.b, o2.c); // 1 2 undefined
+		    
+		    
+		    o2.a = 3;
+		    console.log(o.a, o2.a); // 1 3
+		    
+		    o2.c = 4;
+		    console.log(o.c, o2.c); // undefined 4
+		    
+		    delete o2.a;
+		    console.log(o.a, o2.a); // 1 undefined
+		    
+		    o2.a = 5;
+			console.log(o.a, o2.a); // 1 5
+			
+            console.log(o2.a, o2.b, o2.c); // 5 2 4
+            console.log(o.a, o.b, o.c) // 1 2 undefined
+            
+            
+            var o3 = LazyReadCopy(o);
+		    console.log(o3.a, o3.b, o3.c); // 1 2 undefined
+		    
+		})(this);
+		</script>
+		
+		<title>LazyReadCopy</title>
+	</head>
+	
+	<body>
+	
+	</body>
+</html>

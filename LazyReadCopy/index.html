@@ -14,7 +14,7 @@
 		<script type="text/javascript" src="LazyReadCopy.js"> </script>
 		
 		<script type="text/javascript">
-		(function(global){
+        (function(global){
             var o = {a:1, b:2};
             console.log(o.a, o.b, o.c) // 1 2 undefined
             // I won't manipulate o expect to create LazyReadCopies, so it should remain the same all along
@@ -41,7 +41,7 @@
 
             var o3 = LazyReadCopy(o);
             console.log(o3.a, o3.b, o3.c); // 1 2 undefined
-		})(this);
+        })(this);
 		</script>
 		
 		<title>LazyReadCopy</title>

@@ -43,14 +43,16 @@
 		
 		<script type="application/javascript">
 		var o = MutableProtoObject({a:1, b:2});
-        console.log(Object.getOwnPropertyNames(o));
         console.log(o.a, o.b); // 1, 2 (inherited)
         
-        
 		o.b = 3;
-        console.log(Object.getOwnPropertyNames(o));
         console.log(o.a, o.b); // 1 (inherited), 3 (own)
 		
+		Object.changePrototype(o, {a:2, b:4, c:1});
+		console.log(o.a, o.b, o.c); // 2, 3 (own), 1
+		
+		delete o.b;
+		console.log(o.a, o.b, o.c); // 2, 4, 1 // shadowing of b is over.
 		
 		
 		</script>

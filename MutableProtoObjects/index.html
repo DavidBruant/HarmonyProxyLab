@@ -43,8 +43,12 @@
 		
 		<script type="application/javascript">
 		var o = MutableProtoObject({a:1, b:2});
+        console.log(Object.getOwnPropertyNames(o));
         console.log(o.a, o.b); // 1, 2 (inherited)
+        
+        
 		o.b = 3;
+        console.log(Object.getOwnPropertyNames(o));
         console.log(o.a, o.b); // 1 (inherited), 3 (own)
 		
 		

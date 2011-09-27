@@ -66,8 +66,7 @@
         },
 
         /* USE DEFAULT DERIVED TRAPS FOR THESE 
-        
-        
+
         has: function(name) {
             var proxy = this.proxy;
             var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
@@ -82,15 +81,54 @@
            
              return this.target[name];
         },
-
-        set: function(receiver, name, value) {
-            if (canPut(this.target, name)) { // canPut as defined in ES5 8.12.4 [[CanPut]]
-             this.target[name] = value;
-             return true;
-            }
-            return false; // causes proxy to throw in strict mode, ignore otherwise
-        },
         */
+        
+        set: function(receiver, name, val) {
+            var desc = this.getOwnPropertyDescriptor(name);
+            var setter;
+            if (desc) {
+              if ('writable' in desc) {
+                if (desc.writable) {
+                  this.defineProperty(name, {value: val});
+                  return true;
+                } else {
+                  return false;
+                }
+              } else { // accessor
+                setter = desc.set;
+                if (setter) {
+                  setter.call(receiver, val);
+                  return true;
+                } else {
+                  return false;
+                }
+              }
+            }
+            desc = this.getPropertyDescriptor(name);
+            if (desc) {
+              if ('writable' in desc) {
+                if (desc.writable) {
+                  // fall through
+                } else {
+                  return false;
+                }
+              } else { // accessor
+                var setter = desc.set;
+                if (setter) {
+                  setter.call(receiver, val);
+                  return true;
+                } else {
+                  return false;
+                }
+              }
+            }
+            this.defineProperty(name, {
+              value: val, 
+              writable: true, 
+              enumerable: true, 
+              configurable: true});
+            return true;
+          },
         
         enumerate: function() {
             var proxy = this.proxy;

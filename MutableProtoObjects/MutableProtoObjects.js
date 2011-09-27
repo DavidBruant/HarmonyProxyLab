@@ -26,21 +26,22 @@
                                      throw new Error("Sorry buddy, no can't do! Can't change the prototype of the passed object. " +
                                                      "It was certainly not created with MutableProtoObject!");
     
+                                 // TODO Check whether o is in newProto's [[Prototype]] chain.
+                                 // Throw if it's the case to avoid prototype cycles
+    
                                  objectToProto.set(o, newProto);
                                  
                                  // return value?
                              };
     
 
-    this.MutableProtoObject = function(initialProto){
+    global.MutableProtoObject = function(initialProto){
                                   var target = Object.create(null);
-                                  // Wrap target in a forwarder proxy ([[Prototype]] = initialProto? initialProto: null)
-                                  // The forwarder forwards at the own layer, but delegates to the "dynamic" prototype
-                                  // (proxy attached to the handler as this.proxy)
+                                  var fTarget = new Forwarder(target);
                                   
-                                  // Add the proxy to the weakmap with the proto associated to it.
+                                  objectToProto.set(fTarget, initialProto ? initialProto : null);
                                   
-                                  
+                                  return fTarget;
                               };
                               
 })(this);

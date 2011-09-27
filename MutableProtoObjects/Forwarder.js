@@ -1,6 +1,6 @@
 "use strict";
 
-(function(){
+(function(global){
 
     // Copied from http://wiki.ecmascript.org/doku.php?id=harmony:proxy_defaulthandler
     var Handler = function(target) {
@@ -10,28 +10,22 @@
     Handler.prototype = {
 
         // == own layer traps ==
-
-        // Object.getOwnPropertyDescriptor(proxy, name) -> pd | undefined
         getOwnPropertyDescriptor: function(name) {
             var desc = Object.getOwnPropertyDescriptor(this.target, name);
             if (desc !== undefined) { desc.configurable = true; }
                 return desc;
         },
         
-        // Object.getOwnPropertyNames(proxy) -> [ string ]
         getOwnPropertyNames: function() {
             return Object.getOwnPropertyNames(this.target);
         },
 
-        // Object.defineProperty(proxy, name, pd) -> undefined
         defineProperty: function(name, desc) {
             return Object.defineProperty(this.target, name, desc);
         },
 
-        // delete proxy[name] -> boolean
         delete: function(name) { return delete this.target[name]; },
 
-        // Object.{freeze|seal|preventExtensions}(proxy) -> proxy
         fix: function() {
             // As long as target is not frozen, the proxy won't allow itself to be fixed
             if (!Object.isFrozen(this.target)) {
@@ -44,33 +38,51 @@
             return props;
         },
         
-        // ({}).hasOwnProperty.call(proxy, name) -> boolean
         hasOwn: function(name) { return ({}).hasOwnProperty.call(this.target, name); },
 
+        keys: function() { return Object.keys(this.target); },
+        // == own layer traps ==
+
+
         // == inheritance-related traps ==
-
-        // Object.getPropertyNames(proxy) -> [ string ]
         getPropertyNames: function() {
-            return Object.getPropertyNames(this.target);
+            var proxy = this.proxy;
+            var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
+            
+            var names = this.getOwnPropertyNames();
+            return proto === null ?
+                names:
+                names.concat(Object.getPropertyNames(proto)); // TODO: remove duplicates?
         },
         
-        
-        // Object.getPropertyDescriptor(proxy, name) -> pd | undefined
         getPropertyDescriptor: function(name) {
-            var desc = Object.getPropertyDescriptor(this.target, name);
-            if (desc !== undefined) { desc.configurable = true; }
-                return desc;
+            var proxy = this.proxy;
+            var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
+            
+            var desc = this.getOwnPropertyDescriptor(name);
+            return (desc !== undefined || proto === null) ?
+                desc:
+                Object.getPropertyDescriptor(proto, name);
         },
 
-        // name in proxy -> boolean
-        has: function(name) { return name in this.target; },
+        /* USE DEFAULT DERIVED TRAPS FOR THESE 
+        
+        
+        has: function(name) {
+            var proxy = this.proxy;
+            var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
+            
+            var has = this.hasOwn(name);
+            return !has && proto === null ?
+                false:
+                name in proto;
+        },
 
+        get: function(receiver, name) {
+           
+             return this.target[name];
+        },
 
-
-        // proxy[name] -> any
-        get: function(receiver, name) { return this.target[name]; },
-
-        // proxy[name] = value
         set: function(receiver, name, value) {
             if (canPut(this.target, name)) { // canPut as defined in ES5 8.12.4 [[CanPut]]
              this.target[name] = value;
@@ -78,24 +90,32 @@
             }
             return false; // causes proxy to throw in strict mode, ignore otherwise
         },
-
-        // for (var name in proxy) { ... }
+        */
+        
         enumerate: function() {
-            var result = [];
-            for (var name in this.target) { result.push(name); };
+            var proxy = this.proxy;
+            var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
             
+            var result = this.keys();
+            if(proto !== null)
+                for (var name in proto) { result.push(name); };
+
             return result;
-        },
+        }
+        // == inheritance-related traps ==
 
 
 
-        // Object.keys(proxy) -> [ string ]
-        keys: function() { return Object.keys(this.target); }
     };
 
 
-    this.ProtoChangingForwarder = function(){
-    
+    global.Forwarder = function(o){
+        var handler = new Handler(o);
+        var p = Proxy.create(handler, Object.getPrototypeOf(o));
+        handler.proxy = p;
+        
+        return p;
     };
 
-})();
+
+})(this);

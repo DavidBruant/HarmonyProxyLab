@@ -10,17 +10,50 @@
 		    background: #EEE;
 		}
 		</style>
-		
-		<script type="text/javascript" src="NonExtensibleProxies.js"> </script>
-		
-		<script type="text/javascript">
-        
+
+		<script type="application/javascript">
+        /***
+        ** Copied from http://wiki.ecmascript.org/doku.php?id=strawman:proxy_derived_traps
+        ** These won't call the proxy traps.
+        */
+        Object.getPropertyDescriptor = function(proxy, name) {
+          var pd = Object.getOwnPropertyDescriptor(proxy, name);
+          var proto = Object.getPrototypeOf(proxy);
+          while (pd === undefined && proto !== null) {
+            pd = Object.getOwnPropertyDescriptor(proto, name);
+            proto = Object.getPrototypeOf(proto);
+          }
+          return pd;
+        }
+         
+        Object.getPropertyNames = function(proxy) {
+          var props = Object.getOwnPropertyNames(proxy);
+          var proto = Object.getPrototypeOf(proxy);
+          while (proto !== null) {
+            props = props.concat(Object.getOwnPropertyNames(proto));
+            proto = Object.getPrototypeOf(proto);
+          }
+          // remove duplicate property names from props (not shown)
+          return props;
+        }    
 		</script>
 		
-		<title>LazyReadCopy</title>
+		<script type="application/javascript" src="Forwarder.js"> </script>
+		<script type="application/javascript" src="MutableProtoObjects.js"> </script>
+		
+		<script type="application/javascript">
+		var o = MutableProtoObject({a:1, b:2});
+        console.log(o.a, o.b); // 1, 2 (inherited)
+		o.b = 3;
+        console.log(o.a, o.b); // 1 (inherited), 3 (own)
+		
+		
+		
+		</script>
+		
+		
+		<title>MutableProtoObjects</title>
 	</head>
 	
-	<body>
-	    <p>Proxies that can be made non-extensible without loosing their proxy power.</p>
-	</body>
+	<body> </body>
 </html>

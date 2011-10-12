@@ -1,88 +1,158 @@
 "use strict";
 
 (function(global){
-    // create a forwarder handler to some object new object
 
-    // redefine Object.getOwnPropertyDescriptor.
-    // If the descriptor defines an event ("event":true), create an event
-    // Object.create(null); + addListener + removeListener + fire
+    // Redefining Object.defineProperty to work around https://bugzilla.mozilla.org/show_bug.cgi?id=601379
+    var nativeObjectDefineProperty = Object.defineProperty;
+    var descriptorMap = new WeakMap();
+    
+    Object.defineProperty = function defineProperty(o, name, desc){
+        var descs;
+        var ret;
+        
+        if(!descriptorMap.has(o))
+            descriptorMap.set(o, Object.create(null));
+        descs = descriptorMap.get(o);
+        descs[name] = desc;
+        
+        try{
+            // call the native function (which traps if o is a proxy)
+            ret = nativeObjectDefineProperty(o, name, desc);
+        }
+        catch(e){
+            // forward the error
+            throw e;
+        }
+        finally{
+            // remove the entry
+            delete descs[name];
+        }
+        
+        return ret;
+    };
+    
+
+
 
     /***
     ** Design decision:
     ** * return an object with separate functions to allow
     ** separation of functionalities (especially adding listeners and firing)
     */
-    function makeEventProperty(o, canFire){
+    function makeEventProperty(o){
         var listeners = [];
-        var ret = Object.create(null);
+        var canFire = true;
 
-        ret.addListener = function(l){
-            listeners.push(l);
-        };
+        return {
+            addListener : function(l){
+                listeners.push(l);
+            },
 
-        ret.removeListener = function(f){
-            var i = listeners.indexOf(f);
+            removeListener : function(f){
+                var i = listeners.indexOf(f);
 
-            return i === -1 ?
-                false:
-                delete listeners[i]; // Removes the function, keeps the order of the rest and efficient
-        };
+                return i === -1 ?
+                    false:
+                    delete listeners[i]; // Removes the function, keeps the order of the rest and efficient
+            },
 
-        ret.fire = function(){
-            var args = arguments;
+            fire : function(){
+                var args = arguments;
 
-            if( canFire() ){
-                listeners.forEach(function(f){
-                    f.apply(o, args);
-                });
+                if( canFire ){
+                    listeners.forEach(function(f){
+                        f.apply(o, args); // OPEN_QUESTION: is this the right way to deal with bound functions?
+                    });
+                }
+                else{
+                    throw new Error("The event can't be fired anymore");
+                    // TODO: create my own error type.
+                }
+            },
+            
+            revokeEvent : function(){
+                canFire = false;
             }
-            else{
-                throw new Error("The event can't be fired anymore");
-                // TODO: create my own error type.
-            }
         };
-
-        return ret;
     }
-
+    
+    
 
     // Based on http://wiki.ecmascript.org/doku.php?id=harmony:proxy_defaulthandler
     var Handler = function(target) {
         this.target = target;
-        this.events = {};
+        this.events = Object.create(null);
+        this.eventRevokers = Object.create(null);
     };
      
     Handler.prototype = {
 
         // == own layer traps ==
         getOwnPropertyDescriptor: function(name) {
-            // TODO handle event case
-        
-            var desc = Object.getOwnPropertyDescriptor(this.target, name);
-            if (desc !== undefined) { desc.configurable = true; }
-                return desc;
+            var eventDesc = Object.getOwnPropertyDescriptor(this.events, name);
+
+            if(eventDesc !== undefined){ // event case
+                delete eventDesc.writable;
+                delete eventDesc.value;
+                // keep enumerable and configurable as is
+                eventDesc.event = true;
+                return eventDesc; 
+            }
+            else{ // normal cases
+                var desc = Object.getOwnPropertyDescriptor(this.target, name);
+                if (desc !== undefined) { desc.configurable = true; }
+                    return desc;
+            }
         },
         
         getOwnPropertyNames: function() {
-            return Object.getOwnPropertyNames(this.target);
+            return Object.getOwnPropertyNames(this.target); // TODO add events
         },
 
         defineProperty: function(name, desc) {
+            var proxy = this.proxy;
+            var event;
+            
+            // Working around https://bugzilla.mozilla.org/show_bug.cgi?id=601379
+            var descArg = desc; // passed as argument to the trap
+            if(descriptorMap.has(proxy)){
+                desc = descriptorMap.get(proxy)[name]; // passed by the user ( /!\ no completion, no coercion /!\ )
+            }
+            
+            
             if(desc.event){
-              // TODO Create an event property with the factory
-              // The canFire function must be shared with the delete trap.
-              
+                // OPEN_QUESTION: Check if the event property already exists before creating a new one?
+                event = makeEventProperty(proxy);
+                
+                delete desc.writable;
+                desc.value = event; // reuse configurable & enumerable
+                
+                Object.defineProperty(this.events, name, desc);
+                
+                // detach the revoker
+                desc.value = event.revokeEvent; // reuse configurable & enumerable
+                Object.defineProperty(this.eventRevokers, name, desc);
+                delete event.revokeEvent;
+                
+                return true;
             }
             else{
-              return Object.defineProperty(this.target, name, desc);
+                return Object.defineProperty(this.target, name, desc);
             }
         },
 
         delete: function(name) {
-            // TODO handle event case (play with canFire)
+            if(name in this.events){
+                if(delete this.events[name]){
+                    this.eventRevokers[name](); // revoke in case someone kept a reference to the fire function
+                    delete this.eventRevokers[name];
+                    return true;
+                }
+                
+                return false;
+            }
         
             return delete this.target[name];
-            
         },
 
         fix: function() {
@@ -123,8 +193,13 @@
                 desc:
                 Object.getPropertyDescriptor(proto, name);
         },
-        
-        // TODO: figure out a proper behavior for get and set
+
+        get: function(receiver, name) {
+             return name in this.events ?
+                 this.events[name]:
+                 this.target[name];
+        },
+
 
         /* USE DEFAULT DERIVED TRAPS FOR THESE 
 
@@ -138,12 +213,9 @@
                 name in proto;
         },
 
-        get: function(receiver, name) {
-           
-             return this.target[name];
-        },
         */
         
+        // TODO: figure out a proper behavior for set
         set: function(receiver, name, val) {
             var desc = this.getOwnPropertyDescriptor(name);
             var setter;
@@ -206,12 +278,15 @@
 
 
     global.EventedObject = function(proto){
+        proto = proto || null;
+    
         var handler = new Handler(Object.create(proto));
         var p = Proxy.create(handler, proto);
         handler.proxy = p;
         
         return p;
     };
+
 
 
 })(this);

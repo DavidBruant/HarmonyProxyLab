@@ -51,15 +51,18 @@
             // Add an event
             Object.defineProperty(o, 'e', {configurable: true, enumerable: false, event:true});
 
-            // Add listeners        
-            o.e.addListener(function f1(msg){
-                              console.log("f1", msg);
-                            });
-            
-            o.e.addListener(function f2(msg){
-                              console.log("f2", msg);
-                              console.log(JSON.Stringify(this)); // this is bound to o
-                            });             
+            // Add listeners
+            function f2(msg){
+                console.log("f2", msg);
+                console.log("f2", JSON.stringify(this)); // |this| is bound to o
+            }
+            function f1(msg){
+                console.log("f1", msg);
+            }
+
+            o.e.addListener(f1);
+            o.e.addListener(f2);             
+
             
             // Play with the API
             o.e.fire("This is a message"); // f1, f2 are called
@@ -82,7 +85,7 @@
         </script>
 		
 		
-		<title>MutableProtoObjects</title>
+		<title>Objects with events as properties</title>
 	</head>
 	
 	<body> </body>

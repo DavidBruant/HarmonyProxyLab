@@ -65,12 +65,11 @@
 
             
             // Play with the API
-            o.e.fire("This is a message"); // f1, f2 are called
+            o.e("This is a message"); // f1, f2 are called
             o.e.removeListener(f2);
-            o.e.fire("This is another message"); // Only f1 is called
+            o.e("This is another message"); // Only f1 is called
             
-            // Extracting fire
-            var fire = o.e.fire;
+            var fire = o.e;
             fire("A message with the method isolated");
             
             // Remove the event from the object.

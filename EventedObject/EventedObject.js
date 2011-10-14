@@ -33,7 +33,6 @@
     
 
 
-
     /***
     ** Design decision:
     ** * return an object with separate functions to allow
@@ -41,42 +40,41 @@
     */
     function makeEventProperty(o){
         var listeners = []; // array or null (event removed from object)
-        var canFire = true;
 
-        return {
-            addListener : function(l){
-                if(listeners) // OPEN_QUESTION: Should i let it throw instead?
-                    listeners.push(l);
-            },
+        var ret = function(){
+            var args = arguments;
 
-            removeListener : function(f){
-                if(listeners){ // OPEN_QUESTION: Should i let it throw instead?
-                    var i = listeners.indexOf(f);
-
-                    return i === -1 ?
-                        false:
-                        delete listeners[i]; // Removes the function, keeps the order of the rest and efficient
-                }
-            },
-
-            fire : function(){
-                var args = arguments;
-
-                if( listeners ){
-                    listeners.forEach(function(f){
-                        f.apply(o, args); // OPEN_QUESTION: is this the right way to deal with bound functions?
-                    });
-                }
-                else{
-                    throw new Error("The event can't be fired anymore");
-                    // TODO: create my own error type.
-                }
-            },
-            
-            revokeEvent : function(){
-                listeners = null;
+            if( listeners ){
+                listeners.forEach(function(f){
+                    f.apply(o, args); // OPEN_QUESTION: is this the right way to deal with bound functions?
+                });
+            }
+            else{
+                throw new Error("The event can't be fired anymore");
+                // TODO: create my own error type.
             }
         };
+
+        ret.addListener = function(l){
+            if(listeners) // OPEN_QUESTION: Should i let it throw instead?
+                listeners.push(l);
+        },
+
+        ret.removeListener = function(f){
+            if(listeners){ // OPEN_QUESTION: Should i let it throw instead?
+                var i = listeners.indexOf(f);
+
+                return i === -1 ?
+                    false:
+                    delete listeners[i]; // Removes the function, keeps the order of the rest and efficient
+            }
+        },
+        
+        ret.revokeEvent = function(){
+            listeners = null;
+        }
+            
+        return ret;
     }
     
     

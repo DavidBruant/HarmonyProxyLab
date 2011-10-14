@@ -40,26 +40,29 @@
     ** separation of functionalities (especially adding listeners and firing)
     */
     function makeEventProperty(o){
-        var listeners = [];
+        var listeners = []; // array or null (event removed from object)
         var canFire = true;
 
         return {
             addListener : function(l){
-                listeners.push(l);
+                if(listeners) // OPEN_QUESTION: Should i let it throw instead?
+                    listeners.push(l);
             },
 
             removeListener : function(f){
-                var i = listeners.indexOf(f);
+                if(listeners){ // OPEN_QUESTION: Should i let it throw instead?
+                    var i = listeners.indexOf(f);
 
-                return i === -1 ?
-                    false:
-                    delete listeners[i]; // Removes the function, keeps the order of the rest and efficient
+                    return i === -1 ?
+                        false:
+                        delete listeners[i]; // Removes the function, keeps the order of the rest and efficient
+                }
             },
 
             fire : function(){
                 var args = arguments;
 
-                if( canFire ){
+                if( listeners ){
                     listeners.forEach(function(f){
                         f.apply(o, args); // OPEN_QUESTION: is this the right way to deal with bound functions?
                     });
@@ -71,7 +74,7 @@
             },
             
             revokeEvent : function(){
-                canFire = false;
+                listeners = null;
             }
         };
     }

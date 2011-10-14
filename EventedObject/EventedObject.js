@@ -38,7 +38,7 @@
     ** * return an object with separate functions to allow
     ** separation of functionalities (especially adding listeners and firing)
     */
-    function makeEventProperty(o){
+    function makeEventProperty(o, defaultBehavior){
         var listeners = []; // array or null (event removed from object)
 
         var ret = function(){
@@ -48,6 +48,10 @@
                 listeners.forEach(function(f){
                     f.apply(o, args); // OPEN_QUESTION: is this the right way to deal with bound functions?
                 });
+                
+                if(defaultBehavior){
+                    defaultBehavior.apply(o, args); // OPEN_QUESTION: default as first listener? last? configurable?
+                }
             }
             else{
                 throw new Error("The event can't be fired anymore");
@@ -123,7 +127,9 @@
             
             if(desc.event){
                 // OPEN_QUESTION: Check if the event property already exists before creating a new one?
-                event = makeEventProperty(proxy);
+                event = makeEventProperty(proxy, typeof desc.event === 'function'?
+                                                     desc.event:
+                                                     undefined);
                 
                 delete desc.writable;
                 desc.value = event; // reuse configurable & enumerable

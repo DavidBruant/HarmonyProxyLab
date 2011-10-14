@@ -81,6 +81,12 @@
             catch(e){
               console.log("Error catched", e);
             }
+            
+            
+            // default behavior
+            Object.defineProperty(o, 'f', {configurable: true, enumerable: false, event:function(){console.log('default behavior');}});
+            o.f();
+            
         </script>
 		
 		

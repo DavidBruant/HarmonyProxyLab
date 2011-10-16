@@ -1,17 +1,17 @@
 <!doctype html>
 <html lang="en">
-	<head>
-	    <meta charset="UTF-8">
-		
-		<style>
-		html,body{
-		    width: 100%;
-		    height: 100%;
-		    background: #EEE;
-		}
-		</style>
+    <head>
+        <meta charset="UTF-8">
+        
+        <style>
+        html,body{
+            width: 100%;
+            height: 100%;
+            background: #EEE;
+        }
+        </style>
 
-		<script type="application/javascript">
+        <script type="application/javascript">
         /***
         ** Copied from http://wiki.ecmascript.org/doku.php?id=strawman:proxy_derived_traps
         ** These won't call the proxy traps.
@@ -36,12 +36,12 @@
           // remove duplicate property names from props (not shown)
           return props;
         }    
-		</script>
-		
-		
-		<script type="application/javascript" src="EventedObject.js"> </script>
-		
-		<script type="application/javascript">
+        </script>
+        
+        
+        <script type="application/javascript" src="EventedObject.js"> </script>
+        
+        <script type="application/javascript">
             var o = new EventedObject();
             
             // Add properties like a normal object
@@ -88,10 +88,10 @@
             o.f();
             
         </script>
-		
-		
-		<title>Objects with events as properties</title>
-	</head>
-	
-	<body> </body>
+        
+        
+        <title>Objects with events as properties</title>
+    </head>
+    
+    <body> </body>
 </html>

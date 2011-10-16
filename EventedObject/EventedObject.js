@@ -42,7 +42,7 @@
     ** OPEN_QUESTION: Is it a good thing?
     ** This is handy though. How to allow revokation anyway?
     */
-    function makeEventProperty(o, defaultBehavior){
+    function makeEventProperty(defaultBehavior){
         var listeners = []; // array or null (when event removed from object)
 
         var ret = function(){
@@ -50,11 +50,11 @@
 
             if( listeners ){
                 listeners.forEach(function(f){
-                    f.apply(o, args); // OPEN_QUESTION: is this the right way to deal with bound functions?
-                });
+                    f.apply(this, args); // OPEN_QUESTION: is this the right way to deal with bound functions?
+                }, this);
                 
                 if(defaultBehavior){
-                    defaultBehavior.apply(o, args); // OPEN_QUESTION: default as first listener? last? configurable?
+                    defaultBehavior.apply(this, args); // OPEN_QUESTION: default as first listener? last? configurable?
                 }
             }
             else{
@@ -92,6 +92,7 @@
     var Handler = function(target) {
         this.target = target;
         this.events = Object.create(null);
+        this.perInstanceEvent = Object.create(null);
         this.eventRevokers = Object.create(null);
     };
      
@@ -99,6 +100,7 @@
 
         // == own layer traps ==
         getOwnPropertyDescriptor: function(name) {
+            console.log("getOwnPropertyDescriptor trap", name);
             var eventDesc = Object.getOwnPropertyDescriptor(this.events, name);
 
             if(eventDesc !== undefined){ // event case
@@ -132,14 +134,22 @@
             
             if(desc.event){
                 // OPEN_QUESTION: Check if the event property already exists before creating a new one?
-                event = makeEventProperty(proxy, typeof desc.event === 'function'?
-                                                     desc.event:
-                                                     undefined);
+                
+                event = makeEventProperty(typeof desc.event === 'function'?
+                                              desc.event:
+                                              undefined);
                 
                 delete desc.writable;
                 desc.value = event; // reuse configurable & enumerable
                 
                 Object.defineProperty(this.events, name, desc);
+                
+                desc.value = new WeakMap(); // reuse configurable & enumerable
+                Object.defineProperty(this.perInstanceEvent, name, desc);
+                var boundEvent = event.bind(proxy);
+                boundEvent.addListener = event.addListener;
+                boundEvent.removeListener = event.removeListener;
+                this.perInstanceEvent[name].set(proxy, boundEvent);
                 
                 // detach the revoker
                 desc.value = event.revokeEvent; // reuse configurable & enumerable
@@ -197,6 +207,7 @@
         },
         
         getPropertyDescriptor: function(name) {
+            console.log("getPropertyDescriptor trap", name);
             var proxy = this.proxy;
             var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
             
@@ -207,9 +218,27 @@
         },
 
         get: function(receiver, name) {
-             return name in this.events ?
-                 this.events[name]:
-                 this.target[name];
+             console.log("get trap", name);
+             
+             var event;
+             if(name in this.events){
+                 if(this.perInstanceEvent[name].has(receiver)){
+                     return this.perInstanceEvent[name].get(receiver);
+                 }
+                 else{
+                     event = this.events[name];
+                     var ret = event.bind(receiver);
+                     ret.addListener = event.addListener;
+                     ret.removeListener = event.removeListener;
+                     
+                     this.perInstanceEvent[name].set(receiver, ret);
+                     
+                     return ret;
+                 }
+             }
+             else
+                 return this.target[name];
+                 
         },
 
 

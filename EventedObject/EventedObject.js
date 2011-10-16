@@ -37,9 +37,13 @@
     ** Design decision:
     ** * return an object with separate functions to allow
     ** separation of functionalities (especially adding listeners and firing)
+    ** * with fire as [[call]], holding a reference to the object =>
+    ** holding a reference to the event property => being able to fire
+    ** OPEN_QUESTION: Is it a good thing?
+    ** This is handy though. How to allow revokation anyway?
     */
     function makeEventProperty(o, defaultBehavior){
-        var listeners = []; // array or null (event removed from object)
+        var listeners = []; // array or null (when event removed from object)
 
         var ret = function(){
             var args = arguments;
@@ -59,6 +63,7 @@
             }
         };
 
+        // OPEN_QUESTION: What to do if l is already here? toggle? add twice? once and return false?
         ret.addListener = function(l){
             if(listeners) // OPEN_QUESTION: Should i let it throw instead?
                 listeners.push(l);

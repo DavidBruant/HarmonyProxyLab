@@ -1,0 +1,43 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+
+    <script type="text/javascript" src="IndexedPropStackObject.js"> </script>
+    
+    <script type="text/javascript">
+    var so = new IndexedPropStackObject();
+    
+    Object.defineProperty(so, "a", {value:1});
+    console.log(so.a); // 1
+    
+    Object.defineProperty(so, "a", {value:2, index:3}); // FF4 removes the index property
+    console.log(so.a); // 2
+    
+    Object.defineProperty(so, "a", {value:3});
+    console.log(so.a); // 2...
+    
+    Object.getOwnPropertyNames(so); // ['a','a','a'] . So there are three of them!
+    // not console.logged because FF4 currently removes dups
+    
+    Object.defineProperty(so, "a", {value:4});
+    console.log(so.a); // 2...
+    
+    Object.defineProperty(so, "a", {value:5});
+    console.log(so.a); // 5. Cool! Actually, calls with value 3 and 4 were filing the holes for indices 1 and 2 (0 being taken by first defineProp, 3 by specific assignment)
+    
+    var desc = Object.getOwnPropertyDescriptor(so, "a");
+    // Should look like [{value=1, index=0}, {value=2, index=1}, {value=3, index=2}, {value=4, index=3}, {value=5, index=4}]
+    console.log(desc, '<== Value returned by Object.getOwnPropertyDescriptor(so, "a");');
+    </script>
+
+
+    <title> TITLE </title>    
+
+  </head>
+
+  
+  <body>
+
+  </body>
+</html>

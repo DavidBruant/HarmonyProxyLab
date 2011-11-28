@@ -1,0 +1,51 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+
+    <script type="text/javascript" src="PropStackObject.js"> </script>
+    
+    <script type="text/javascript">
+    var desc = {value:1, enumerable:true, configurable:true, writable:true};
+    var so = new PropStackObject();
+    
+    Object.defineProperty(so, "a", desc);
+    console.log(so.a); // 1
+    
+    desc.value = 2;
+    Object.defineProperty(so, "a", desc);
+    console.log(so.a); // 2
+    
+    desc.value = 3;
+    Object.defineProperty(so, "a", desc);
+    console.log(so.a); // 3. No surprises so far
+    
+    var del = delete so.a;
+    console.log(del, ({}).hasOwnProperty.call(so, 'a')); // true, true... Wait, WHAT?
+    console.log(so.a); // 2... hmm...
+    
+    so.a = 37;
+    console.log(so.a); // 37
+    
+    desc.value = 4;
+    Object.defineProperty(so, "a", desc);
+    console.log(so.a); // 4
+
+    delete so.a;
+    console.log(so.a); // 37... So it's like stacking up or something? I have several 'a' properties?
+
+    // So now, I have the 37 and the 1 I put at the beginning. So I have 2 'a' properties, right? Let's check!    
+    var names = Object.getOwnPropertyNames(so); 
+    console.log(names, '<== Value returned by Object.getOwnPropertyNames(so)'); // Should be ['a', 'a'] but is currently ['a'] due to FF4 data massaging
+    </script>
+
+
+    <title> TITLE </title>    
+
+  </head>
+
+  
+  <body>
+
+  </body>
+</html>

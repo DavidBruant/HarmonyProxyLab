@@ -16,6 +16,8 @@
 
 		
 		<script type="text/javascript">
+		"use strict";
+		
         (function(global){
             var o = {a:1, b:2};
             console.log(o.a, o.b, o.c) // 1 2 undefined
@@ -32,7 +34,7 @@
             console.log(o.c, o2.c); // undefined 4
 
             delete o2.a;
-            console.log(o.a, o2.a); // 1 undefined
+            console.log(o.a, o2.a); // 1 undefined //TODO delete is not effective
 
             o2.a = 5;
             console.log(o.a, o2.a); // 1 5

@@ -32,13 +32,14 @@
         },
                                   
         delete: function(target, name){
-            var pd = this.getOwnPropertyDescriptor(target, name); // there is a property to delete
-            var ret = pd && pd.configurable; // ... or whatever condition makes the delete operation returning true
-            
-            this.deletedProperties[name] = true;
-          
-            delete target[name];
-            // never delete from this.ancestor: other folks may need the property
+            var targetPd = this.getOwnPropertyDescriptor(target, name);
+            var ancestorPd = Object.getOwnPropertyDescriptor(this.ancestor, name);
+
+            var ret = (targetPd && targetPd.configurable) || (ancestorPd && ancestorPd.configurable);
+
+            if(ret && ancestorPd)
+                this.deletedProperties[name] = true;
+
             return ret;
         },
         
@@ -107,7 +108,7 @@
     global.Branch = function(ancestor){
         var target;
         var handler = Object.create(handlerProto);
-        handler.deletedProperties = {};
+        handler.deletedProperties = Object.create(null);
         handler.ancestor = ancestor;
 
         if(typeof ancestor === 'function'){

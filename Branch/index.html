@@ -11,7 +11,9 @@
 		}
 		</style>
 		
-		<script type="text/javascript" src="LazyReadCopy.js"> </script>
+		<script type="text/javascript" src="../DirectProxies.js"> </script>		
+		<script type="text/javascript" src="Branch.js"> </script>
+
 		
 		<script type="text/javascript">
         (function(global){
@@ -19,7 +21,7 @@
             console.log(o.a, o.b, o.c) // 1 2 undefined
             // I won't manipulate o expect to create LazyReadCopies, so it should remain the same all along
 
-            var o2 = LazyReadCopy(o);
+            var o2 = Branch(o);
             console.log(o2.a, o2.b, o2.c); // 1 2 undefined
 
 
@@ -39,7 +41,7 @@
             console.log(o.a, o.b, o.c) // 1 2 undefined
 
 
-            var o3 = LazyReadCopy(o);
+            var o3 = Branch(o);
             console.log(o3.a, o3.b, o3.c); // 1 2 undefined
         })(this);
 		</script>

@@ -37,6 +37,9 @@
 
             var ret = (targetPd && targetPd.configurable) || (ancestorPd && ancestorPd.configurable);
 
+            if(targetPd && targetPd.configurable)
+                delete target[name];
+
             if(ret && ancestorPd)
                 this.deletedProperties[name] = true;
 

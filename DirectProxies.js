@@ -1311,8 +1311,7 @@ global.Reflect = {
       }
       if (isDataDescriptor(receiverDesc)) {
         if (!receiverDesc.writable) return false;
-        receiverDesc.value = value;
-        Object.defineProperty(receiver, name, receiverDesc);
+        Object.defineProperty(receiver, name, {value: value});
         return true;
       }
       // property doesn't exist yet, add it

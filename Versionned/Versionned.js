@@ -1,26 +1,91 @@
 "use strict";
 
-function History(){
-    var target = [];
-    target.addEntry = Array.prototype.push.bind(target);
-    
-    var handler = {
-        get: function(target, name){
-            if(this.hasOwn(target, name))
-                return target[i];
-                // TODO: figure out how to better filter
-        }
-    }
-    
-    return Proxy([], handler);
+function makeReadOnly(o){
+    // returns a ReadOnly view of the object
+    // It's a membrane (things accessed from the object are readonly as well)
+    // TODO: implement
+    console.warn('makeReadOnly is not yet implemented');
+    return o;
 }
+
+function Change(){}
+Object.defineProperty(Change, 'CREATION', {value: new Object()});
+Object.defineProperty(Change, 'DELETION', {value: new Object()});
+Object.defineProperty(Change, 'NON_EXTENSIBLE', {value: new Object()});
+
+
+
+
+
+(function(global){
+
+    var handlerProto = {
+        getOwnPropertyDescriptor: function(){
+        
+        },
+        
+        get: function(target, name, receiver){
+            var ret = makeBranch(this.initState);
+            var state = parseInt(name);
+            
+            if(isNaN(state))
+                throw new TypeError();
+            
+            // TODO: apply this.change(s) up to state to ret
+            console.warn('snapshot getter not yet implemented');
+            
+            return makeReadOnly(ret);
+        }
+    
+    }
+
+    /***
+    ** initState: object
+    ** changes: [ {name, change} ]. change is either a property descriptor or a symbolic value
+    */
+    global.makeSnapshots = function(initState, changes){
+        var handler = Object.create(handlerProto);
+        handler.changes = changes;
+        handler.initState = initState;
+
+        var target = new Array(changes.length);
+        
+        return Proxy.create(target, handler);
+    }
+
+})(this);
+
+
+/***
+** changeListener takes a number as argument
+** This number is the key to retrieve the object after the change in the
+** related snapshots object
+*/
+function makeAddChangeSnapshotsPair(initState, changeListener){
+    var changes = [];
+
+    return {
+        addChange: function(change){
+            if(!('name' in change && 'change' in change))
+                throw new TypeError('Object is not of the correct form: ' + JSON.stringify(change));
+        
+            changes.push(change);
+            
+            // notify listeners
+            changeListener(changes.length);
+        },
+        snapshots: makeSnapshots(initState, makeReadOnly(changes))
+    }
+}
+
+
+
 
 
 
 /*****
 ** Versionned objects
 */
-
 (function(global){
     
     /*** UTILS ***/
@@ -43,20 +108,17 @@ function History(){
     */
     function sameDescriptor(pd1, pd2){
         // TODO: complete the descriptors beforehand?
-    
-        return Object.keys(pd1).every(function(attr){
+        
+        return pd1 && pd2 && Object.keys(pd1).every(function(attr){
             return is(pd1[attr], pd2[attr]);
         });
     }
     
-    
-    
-     // TODO: replace this dummy function
+  
+    /* TODO: remove
     function Snapshots(initState, history){        
-        /*
         Array-like object. No setters at all
         
-        */
         {get length(){
             return history.length;
          },
@@ -64,7 +126,7 @@ function History(){
          latest: {} // live read-only copy of the latest
         };
         
-    }
+    }*/
     
     
     
@@ -89,34 +151,48 @@ function History(){
             newPd = Object.getOwnPropertyDescriptor(target, name);
             
             if(!sameDescriptor(currentPd, newPd)){
-                // TODO: add history entry
+                if(!currentPd)
+                    this.addChange({name: name, change: Change.CREATION});
+            
+                this.addChange({name: name, change: newPd});
             }
             
             return true; // is this buggy?
         },
                                   
         delete: function(target, name){
-            var currentPd = Object.getOwnPropertyDescriptor(target, name);
+            var currentPd = Object.getOwnPropertyDescriptor(target, name),
+                newPd,
+                returnValue;
             
-            if(!currentPd)
-                return true; 
+            if(currentPd === undefined)
+                return true; // don't add a change to the history for deleting a non-existing property
             
-            // expediates dummy case
+            try{
+                returnValue = delete target[name]; // forward operation to the target
+            }
+            catch(e){
+                // Delete throwing === non-configurable property
+                return false; // No need to record the history
+            }
             
-            // forward operation to the target
+            newPd = Object.getOwnPropertyDescriptor(target, name);
             
-            // if there is a change in the object state, add an history entry
+            if(newPd === undefined)
+                this.addChange({name: name, change: Change.DELETION});
             
-            // return whatever is relevant
+            return returnValue;
         }
         
-        /*
+        /* traps which alter an object
         function defineProperty(target,name,desc)
+        function set(target,name,value,receiver) ?
+        
         function delete(target,name) 
+        
         function freeze(target)
         function seal(target)
         function preventExtensions(target)
-        function set(target,name,value,receiver)
         */
         
     };
@@ -128,18 +204,18 @@ function History(){
     ** appear to be exactly the same that the target object with the exception
     ** of object identity.
     ** 2) An object which can show the different states the object went through
+    **
+    ** changeListener: see makeAddChangeSnapshotsPair
     */
-    global.Versionned = function(toRecord){
-        
+    global.Versionned = function(toRecord, changeListener){
+        changeListener = changeListener || function(){};
         var handler = Object.create(handlerProto);
-        handler.history = new History();
-
-        // TODO: fake calls to pE/seal/freeze/is{$1,$2,$3} & Object.defineProperty 
-        // in cases they do something irreversible
-        // TODO: instead of using toRecord as the target, branch it and use the branch
         var recorded = new Proxy(toRecord, handler);
-        var snapshots = new Snapshots(recorded, history);
-
+        
+        var pair = makeAddChangeSnapshotsPair(toRecord, changeListener),
+            snapshots = pair.snapshots;
+        handler.addChange = pair.addChange;
+        
         return {recorded: recorded,
                 snapshots: snapshots};
     };

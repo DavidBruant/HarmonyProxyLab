@@ -1,15 +1,15 @@
 <!doctype html>
 <html lang="en">
-	<head>
-	    <meta charset="UTF-8">
+    <head>
+        <meta charset="UTF-8">
 
-		<link rel="stylesheet" href="../qunit.css" type="text/css" media="screen">
-				
-		<script type="text/javascript" src="../jquery.js"> </script>
+        <link rel="stylesheet" href="../qunit.css" type="text/css" media="screen">
+                
+        <script type="text/javascript" src="../jquery.js"> </script>
         <script type="text/javascript" src="../qunit.js"> </script>
 
-		<script type="text/javascript" src="../DirectProxies.js"> </script>		
-		<script type="text/javascript" src="Versionned.js"> </script>
+        <script type="text/javascript" src="../DirectProxies.js"> </script>        
+        <script type="text/javascript" src="Versionned.js"> </script>
 
         <script type="text/javascript">
         QUnit.is = function(x, y) {
@@ -45,14 +45,37 @@
                                  });
                                  
             var sameClass = Object.prototype.toString.call(o1) === Object.prototype.toString.call(o2);
-            var sameExtensible = Object.isExtensible(o1) && Object.isExtensible(o2);
+            var sameExtensible = Object.isExtensible(o1) === Object.isExtensible(o2);
             
             return sameProto && sameProperties && sameClass && sameExtensible;
         }
         </script>
 
 
-		<script type="text/javascript">
+        <script type="text/javascript">
+        (function(){
+            "use strict";
+            var p = Proxy({}, {});
+            
+            Object.defineProperty(p, 'a', {value:1, configurable: false});
+            
+            try{
+                delete p.a;
+                console.log('no error thrown');
+            }
+            catch(e){
+                console.log('error thrown: '+e);
+            }
+            
+        })();
+        </script>
+
+
+
+
+
+
+        <script type="text/javascript">
         "use strict";
         
         $(function(){
@@ -71,7 +94,7 @@
                 ok(typeof v === 'object', "A versionned is an object")
                 ok(typeof v.recorded === 'object', "typeof o.recorded");
                 
-                // ok(Array.isArray(v.snapshots), "Array.isArray(v.snapshots) (Impossible without direct proxies)");
+                // ok(Array.isArray(v.snapshots), "Array.isArray(v.snapshots) (IMPOSSIBLE WITHOUT DIRECT PROXIES)");
             });
 
 
@@ -140,7 +163,7 @@
                     v = new Versionned(o),
                     recorded = v.recorded;
 
-                //ok(Array.isArray === true, "recorded is an Array (impossible without direct proxies)");
+                //ok(Array.isArray === true, "recorded is an Array (IMPOSSIBLE WITHOUT DIRECT PROXIES)");
                 ok(Object.getPrototypeOf(recorded) === Object.getPrototypeOf(o), "Origin and recorded have same [[Prototype]]");
                 ok(typeof recorded === 'object', "typeof recorded === 'object'");
                 
@@ -210,6 +233,24 @@
                                        " is propagated to the original object");
             });
             
+            test("Adding a non-configurable property", function(){
+                var o = {},
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+                
+                
+                Object.defineProperty(recorded, 'a', {value: 1, configurable:false});
+                
+                var descO = Object.getOwnPropertyDescriptor(o, 'a');
+                var descRecorded = Object.getOwnPropertyDescriptor(recorded, 'a');
+                
+                ok(descO.configurable === false, "Property on original object is non-configurable");
+                ok(descRecorded.configurable === false, "Property on original object is non-configurable "+
+                                                        "(impossible without direct proxies)");
+                
+                
+            });
+            
             test("Adding a setter", function(){                
                 var o = {},
                     v = new Versionned(o),
@@ -275,23 +316,43 @@
                 ok('a' in o === false, "Deletion of value properties is propagated to the original object");
                 ok('b' in o === false, "Deletion of accessor properties is propagated to the original object");
 
-                delete recorded.c;
-                ok('c' in recorded && recorded.c === 2, "Non-configurable properties can't be deleted in recorded");
-                
+                try{
+                    delete recorded.c;
+                    ok(false, "Trying to delete a non-configurable property on the recorded object should throw (strict mode)");
+                }
+                catch(e){
+                    ok('c' in recorded && recorded.c === 2, "Non-configurable properties can't be deleted in recorded");
+                }
             });
             
             
+            /*****/
+            module("ChangeListener called when needed");
             
+            test("Adding properties", function(){
+                expect(3);
+                var o = {};
+                var v = new Versionned(o, function(){
+                    ok(true, "A change has been heard");
+                });
+
+                var recorded = v.recorded;
             
+                recorded.a = 1;
+            
+                Object.defineProperty(recorded, 'b', {value: 2});
+                Object.defineProperty(recorded, 'c', {get: function(){}, set:function(){}});
+            
+            });
             
             
         });
-		</script>
+        </script>
 
-		<title>Versionned objects</title>
-	</head>
-	
-	<body>
+        <title>Versionned objects</title>
+    </head>
+    
+    <body>
 
         <h1 id="qunit-header">QUnit example</h1>
         <h2 id="qunit-banner"></h2>
@@ -302,6 +363,6 @@
         <ol id="qunit-tests"></ol>
 
         <div id="qunit-fixture">test markup, will be hidden</div>
-	
-	</body>
+    
+    </body>
 </html>

@@ -11,6 +11,7 @@ function makeReadOnly(o){
 function Change(){}
 Object.defineProperty(Change, 'CREATION', {value: new Object()});
 Object.defineProperty(Change, 'DELETION', {value: new Object()});
+Object.defineProperty(Change, 'UPDATE', {value: new Object()});
 Object.defineProperty(Change, 'NON_EXTENSIBLE', {value: new Object()});
 
 
@@ -66,7 +67,7 @@ function makeAddChangeSnapshotsPair(initState, changeListener){
 
     return {
         addChange: function(change){
-            if(!('name' in change && 'change' in change))
+            if(!('name' in change && 'type' in change)) // type checking could be made more accurate
                 throw new TypeError('Object is not of the correct form: ' + JSON.stringify(change));
         
             changes.push(change);
@@ -136,6 +137,7 @@ function makeAddChangeSnapshotsPair(initState, changeListener){
         defineProperty: function(target, name, pd){
             var currentPd = Object.getOwnPropertyDescriptor(target, name),
                 newPd;
+            var changeType;
             
             if(sameDescriptor(pd, currentPd))
                 return true; // kthxbi
@@ -151,10 +153,12 @@ function makeAddChangeSnapshotsPair(initState, changeListener){
             newPd = Object.getOwnPropertyDescriptor(target, name);
             
             if(!sameDescriptor(currentPd, newPd)){
-                if(!currentPd)
-                    this.addChange({name: name, change: Change.CREATION});
-            
-                this.addChange({name: name, change: newPd});
+                changeType = currentPd ?
+                                Change.UPDATE:
+                                Change.CREATION;
+                                
+                this.addChange({name: name, change: newPd, type: changeType});
+                
             }
             
             return true; // is this buggy?
@@ -168,18 +172,13 @@ function makeAddChangeSnapshotsPair(initState, changeListener){
             if(currentPd === undefined)
                 return true; // don't add a change to the history for deleting a non-existing property
             
-            try{
-                returnValue = delete target[name]; // forward operation to the target
-            }
-            catch(e){
-                // Delete throwing === non-configurable property
-                return false; // No need to record the history
-            }
+            returnValue = delete target[name]; // forward operation to the target
+            // may throw. No try/catch on purpose
             
             newPd = Object.getOwnPropertyDescriptor(target, name);
             
             if(newPd === undefined)
-                this.addChange({name: name, change: Change.DELETION});
+                this.addChange({name: name, type: Change.DELETION});
             
             return returnValue;
         }

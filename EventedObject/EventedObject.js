@@ -1,39 +1,78 @@
 "use strict";
 
+/**
+ * Weird thing to investigate:
+ * Object.getOwnPropertyDescriptor(new Proxy({}, {getOwnPropertyDescriptor: function(){return {event: true}} }))
+ */
+
 (function(global){
+    var Object = global.Object;
 
-    // Redefining Object.defineProperty to work around https://bugzilla.mozilla.org/show_bug.cgi?id=601379
-    var nativeObjectDefineProperty = Object.defineProperty;
     var objectToDefinePropertyDescriptorMap = new WeakMap();
-
-    Object.defineProperty = function defineProperty(o, name, desc){
-        var descMap;
-        var ret;
-
-        if(!objectToDefinePropertyDescriptorMap.has(o))
-            objectToDefinePropertyDescriptorMap.set(o, new Map());
-        descMap = objectToDefinePropertyDescriptorMap.get(o);
-        descMap.set(name, desc);
-
-        try{
-            // call the native function (which traps if o is a proxy)
-            ret = nativeObjectDefineProperty(o, name, desc);
-        }
-        catch(e){
-            // forward the error if any
-            throw e;
-        }
-        finally{
-            // remove the entry
-            descMap.delete(name);
-        }
-
-        return ret;
-    };
-    // end of workaround
-
-
     (function(){
+        "Redefining Object.defineProperty to work around https://bugzilla.mozilla.org/show_bug.cgi?id=601379";
+        var nativeObjectDefineProperty = Object.defineProperty;
+        Object.defineProperty = function defineProperty(o, name, desc){
+            var descMap;
+            var ret;
+
+            if(!objectToDefinePropertyDescriptorMap.has(o))
+                objectToDefinePropertyDescriptorMap.set(o, new Map());
+            descMap = objectToDefinePropertyDescriptorMap.get(o);
+            descMap.set(name, desc);
+
+            try{
+                // call the native function (which traps if o is a proxy)
+                ret = nativeObjectDefineProperty(o, name, desc);
+            }
+            catch(e){
+                // forward the error if any
+                throw e;
+            }
+            finally{
+                // remove the entry
+                descMap.delete(name);
+            }
+
+            return ret;
+        };
+    })();
+
+    var objectToGetOwnPropertyDescriptorMap = new WeakMap();
+    (function(){
+        "Redefining Object.getOwnPropertyDescriptor to work around https://bugzilla.mozilla.org/show_bug.cgi?id=601379";
+        var nativeObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+        Object.getOwnPropertyDescriptor = function getOwnPropertyDescriptor(o, name){
+            var descMap;
+            var ret;
+
+            if(!objectToGetOwnPropertyDescriptorMap.has(o))
+                objectToGetOwnPropertyDescriptorMap.set(o, new Map());
+            descMap = objectToGetOwnPropertyDescriptorMap.get(o);
+            ret = descMap.get(name);
+
+            try{
+                // call the native function (which traps if o is a proxy)
+                ret = nativeObjectGetOwnPropertyDescriptor(o, name, desc);
+            }
+            catch(e){
+                // forward the error if any
+                throw e;
+            }
+            finally{
+                // remove the entry
+                descMap.delete(name);
+            }
+
+            return ret;
+        };
+
+
+    })();
+
+
+
+    (function(){ // hack to prevent trap invariant from bitching if value has changed
         var nativeObjectDefineProperty = Object.defineProperty;
 
         Object.defineProperty = function defineProperty(o, name, desc){

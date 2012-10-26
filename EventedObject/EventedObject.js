@@ -4,330 +4,198 @@
 
     // Redefining Object.defineProperty to work around https://bugzilla.mozilla.org/show_bug.cgi?id=601379
     var nativeObjectDefineProperty = Object.defineProperty;
-    var descriptorMap = new WeakMap();
-    
+    var objectToDefinePropertyDescriptorMap = new WeakMap();
+
     Object.defineProperty = function defineProperty(o, name, desc){
-        var descs;
+        var descMap;
         var ret;
-        
-        if(!descriptorMap.has(o))
-            descriptorMap.set(o, Object.create(null));
-        descs = descriptorMap.get(o);
-        descs[name] = desc;
-        
+
+        if(!objectToDefinePropertyDescriptorMap.has(o))
+            objectToDefinePropertyDescriptorMap.set(o, new Map());
+        descMap = objectToDefinePropertyDescriptorMap.get(o);
+        descMap.set(name, desc);
+
         try{
             // call the native function (which traps if o is a proxy)
             ret = nativeObjectDefineProperty(o, name, desc);
         }
         catch(e){
-            // forward the error
+            // forward the error if any
             throw e;
         }
         finally{
             // remove the entry
-            delete descs[name];
+            descMap.delete(name);
         }
-        
+
         return ret;
     };
-    
+    // end of workaround
+
+
+    (function(){
+        var nativeObjectDefineProperty = Object.defineProperty;
+
+        Object.defineProperty = function defineProperty(o, name, desc){
+            if('event' in desc)
+                desc.writable = true; // hack to prevent trap invariant from bitching if value has changed
+
+            return nativeObjectDefineProperty(o, name, desc);
+        };
+    })();
+
+
+    var setImmediate = global.setImmediate || function setImmediate(f){
+        setTimeout(f, 0);
+    };
 
 
     /***
-    ** Design decision:
-    ** * return an object with separate functions to allow
-    ** separation of functionalities (especially adding listeners and firing)
-    ** * with fire as [[call]], holding a reference to the object =>
-    ** holding a reference to the event property => being able to fire
-    ** OPEN_QUESTION: Is it a good thing?
-    ** This is handy though. How to allow revokation anyway?
-    */
-    function makeEventProperty(defaultBehavior){
+     ** Design decision:
+     ** * return an object with separate functions to allow
+     ** separation of functionalities (especially adding listeners and firing)
+     ** * with fire as [[call]], holding a reference to the object =>
+     ** holding a reference to the event property => being able to fire
+     ** OPEN_QUESTION: Is it a good thing?
+     ** This is handy though. How to allow revokation anyway?
+     */
+    function EventProperty(eventTarget){
         var listeners = []; // array or null (when event removed from object)
 
-        var ret = function(){
+        var eventProp = (function eventProp(){
             var args = arguments;
+            var self = this;
 
             if( listeners ){
                 listeners.forEach(function(f){
-                    f.apply(this, args); // OPEN_QUESTION: is this the right way to deal with bound functions?
-                }, this);
-                
-                if(defaultBehavior){
-                    defaultBehavior.apply(this, args); // OPEN_QUESTION: default as first listener? last? configurable?
-                }
+                    setImmediate(function(){
+                        f.apply(self, args); // OPEN QUESTION: is this the right way to deal with bound functions?
+                    });
+                });
             }
             else{
-                throw new Error("The event can't be fired anymore");
-                // TODO: create my own error type.
+                throw new Error("The event property has been deleted. The event can't be fired anymore.");
             }
-        };
+        }).bind(eventTarget);
 
         // OPEN_QUESTION: What to do if l is already here? toggle? add twice? once and return false?
-        ret.addListener = function(l){
-            if(listeners) // OPEN_QUESTION: Should i let it throw instead?
+        eventProp.addListener = function addListener(l){
+            if(listeners) // OPEN QUESTION: Should I let it throw instead?
                 listeners.push(l);
-        },
+        };
 
-        ret.removeListener = function(f){
-            if(listeners){ // OPEN_QUESTION: Should i let it throw instead?
+        eventProp.removeListener = function removeListener(f){
+            if(listeners){ // OPEN QUESTION: Should I let it throw instead?
                 var i = listeners.indexOf(f);
 
                 return i === -1 ?
                     false:
                     delete listeners[i]; // Removes the function, keeps the order of the rest and efficient
             }
-        },
-        
-        ret.revokeEvent = function(){
+        };
+
+        eventProp.revokeEvent = function(){
             listeners = null;
-        }
-            
-        return ret;
+        };
+
+        return eventProp;
     }
-    
-    
 
-    // Based on http://wiki.ecmascript.org/doku.php?id=harmony:proxy_defaulthandler
-    var Handler = function(target) {
-        this.target = target;
-        this.events = Object.create(null);
-        this.perInstanceEvent = Object.create(null);
-        this.eventRevokers = Object.create(null);
-    };
-     
-    Handler.prototype = {
 
-        // == own layer traps ==
-        getOwnPropertyDescriptor: function(name) {
-            console.log("getOwnPropertyDescriptor trap", name);
-            var eventDesc = Object.getOwnPropertyDescriptor(this.events, name);
+    var targetToProxy = new WeakMap();
+    var targetEventPropMaps = new WeakMap();
+
+    // Per object, we need a map of event properties
+
+    var handler = {
+        getOwnPropertyDescriptor: function(target, name) {
+            var eventDesc = targetEventPropMaps.get(target).get(name);
 
             if(eventDesc !== undefined){ // event case
                 delete eventDesc.writable;
                 delete eventDesc.value;
                 // keep enumerable and configurable as is
                 eventDesc.event = true;
-                return eventDesc; 
+                return eventDesc;
             }
             else{ // normal cases
-                var desc = Object.getOwnPropertyDescriptor(this.target, name);
-                if (desc !== undefined) { desc.configurable = true; }
-                    return desc;
+                return Object.getOwnPropertyDescriptor(target, name);
             }
-        },
-        
-        getOwnPropertyNames: function() {
-            return Object.getOwnPropertyNames(this.target); // TODO add events
         },
 
-        defineProperty: function(name, desc) {
-            var proxy = this.proxy;
+        defineProperty: function(target, name, desc) {
             var event;
-            
+            var ret;
+
             // Working around https://bugzilla.mozilla.org/show_bug.cgi?id=601379
-            var descArg = desc; // passed as argument to the trap
-            if(descriptorMap.has(proxy)){
-                desc = descriptorMap.get(proxy)[name]; // passed by the user ( /!\ no completion, no coercion /!\ )
+            var proxy = targetToProxy.get(target);
+            if(objectToDefinePropertyDescriptorMap.has(proxy)){
+                desc = objectToDefinePropertyDescriptorMap.get(proxy).get(name); // actual desc passed by the user
             }
-            
-            
+            // End of workaround
+
             if(desc.event){
-                // OPEN_QUESTION: Check if the event property already exists before creating a new one?
-                
-                event = makeEventProperty(typeof desc.event === 'function'?
-                                              desc.event:
-                                              undefined);
-                
-                delete desc.writable;
-                desc.value = event; // reuse configurable & enumerable
-                
-                Object.defineProperty(this.events, name, desc);
-                
-                desc.value = new WeakMap(); // reuse configurable & enumerable
-                Object.defineProperty(this.perInstanceEvent, name, desc);
-                var boundEvent = event.bind(proxy);
-                boundEvent.addListener = event.addListener;
-                boundEvent.removeListener = event.removeListener;
-                this.perInstanceEvent[name].set(proxy, boundEvent);
-                
+                var targetDesc = Object.getOwnPropertyDescriptor(target, name);
+                if(targetDesc && !targetDesc.configurable)
+                    throw new Error("Can't reconfigure a non-configurable event property");
+
+                var targetEventPropMap = targetEventPropMaps.get(target);
+                if(!targetEventPropMap){
+                    targetEventPropMap = new Map();
+                    targetEventPropMaps.set(target, targetEventPropMap);
+                }
+
+                event = new EventProperty(targetToProxy.get(target));
+                targetEventPropMap.set(name, event);
+
                 // detach the revoker
                 desc.value = event.revokeEvent; // reuse configurable & enumerable
-                Object.defineProperty(this.eventRevokers, name, desc);
                 delete event.revokeEvent;
-                
-                return true;
+                // for event create a placeholder on the target to work fine with has/hasOwn/getOwnPropertyNames, etc.
             }
-            else{
-                return Object.defineProperty(this.target, name, desc);
+
+            return Object.defineProperty(target, name, desc);
+        },
+
+        deleteProperty: function(target, name) {
+            var targetEventPropMap = targetEventPropMaps.get(target);
+            var revokeEvent;
+            var ret;
+
+            if(targetEventPropMap && targetEventPropMap.has(name)){
+                revokeEvent = target[name];
+                ret = delete target[name]; // naturally throws if non-configurable
+                revokeEvent();
             }
-        },
 
-        delete: function(name) {
-            if(name in this.events){
-                if(delete this.events[name]){
-                    this.eventRevokers[name](); // revoke in case someone kept a reference to the fire function
-                    delete this.eventRevokers[name];
-                    return true;
-                }
-                
-                return false;
-            }
-        
-            return delete this.target[name];
-        },
-
-        fix: function() {
-            // As long as target is not frozen, the proxy won't allow itself to be fixed
-            if (!Object.isFrozen(this.target)) {
-                return undefined;
-            }
-            var props = {};
-            Object.getOwnPropertyNames(this.target).forEach(function(name) {
-                props[name] = Object.getOwnPropertyDescriptor(this.target, name);
-            }.bind(this));
-            return props;
-        },
-        
-        hasOwn: function(name) { return ({}).hasOwnProperty.call(this.target, name); },
-
-        keys: function() { return Object.keys(this.target); },
-        // == own layer traps ==
-
-
-        // == inheritance-related traps ==
-        getPropertyNames: function() {
-            var proxy = this.proxy;
-            var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
-            
-            var names = this.getOwnPropertyNames();
-            return proto === null ?
-                names:
-                names.concat(Object.getPropertyNames(proto)); // TODO: remove duplicates?
-        },
-        
-        getPropertyDescriptor: function(name) {
-            console.log("getPropertyDescriptor trap", name);
-            var proxy = this.proxy;
-            var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
-            
-            var desc = this.getOwnPropertyDescriptor(name);
-            return (desc !== undefined || proto === null) ?
-                desc:
-                Object.getPropertyDescriptor(proto, name);
-        },
-
-        get: function(receiver, name) {
-             console.log("get trap", name);
-             
-             var event;
-             if(name in this.events){
-                 if(this.perInstanceEvent[name].has(receiver)){
-                     return this.perInstanceEvent[name].get(receiver);
-                 }
-                 else{
-                     event = this.events[name];
-                     var ret = event.bind(receiver);
-                     ret.addListener = event.addListener;
-                     ret.removeListener = event.removeListener;
-                     
-                     this.perInstanceEvent[name].set(receiver, ret);
-                     
-                     return ret;
-                 }
-             }
-             else
-                 return this.target[name];
-                 
+            return ret !== undefined ? ret : delete target[name];
         },
 
 
-        /* USE DEFAULT DERIVED TRAPS FOR THESE 
+        get: function(target, name, receiver) {
+            console.log("get trap", name);
 
-        has: function(name) {
-            var proxy = this.proxy;
-            var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
-            
-            var has = this.hasOwn(name);
-            return !has && proto === null ?
-                false:
-                name in proto;
+            var targetEventMap = targetEventPropMaps.get(target);
+
+            return targetEventMap && targetEventMap.has(name) ?
+                targetEventMap.get(name) :
+                target[name];
+
         },
 
-        */
-        
-        // TODO: figure out a proper behavior for set
-        set: function(receiver, name, val) {
-            var desc = this.getOwnPropertyDescriptor(name);
-            var setter;
-            if (desc) {
-              if ('writable' in desc) {
-                if (desc.writable) {
-                  this.defineProperty(name, {value: val});
-                  return true;
-                } else {
-                  return false;
-                }
-              } else { // accessor
-                setter = desc.set;
-                if (setter) {
-                  setter.call(receiver, val);
-                  return true;
-                } else {
-                  return false;
-                }
-              }
-            }
-            desc = this.getPropertyDescriptor(name);
-            if (desc) {
-              if ('writable' in desc) {
-                if (desc.writable) {
-                  // fall through
-                } else {
-                  return false;
-                }
-              } else { // accessor
-                var setter = desc.set;
-                if (setter) {
-                  setter.call(receiver, val);
-                  return true;
-                } else {
-                  return false;
-                }
-              }
-            }
-            this.defineProperty(name, {
-              value: val, 
-              writable: true, 
-              enumerable: true, 
-              configurable: true});
-            return true;
-          },
-        
-        enumerate: function() {
-            var proxy = this.proxy;
-            var proto = Object.getPrototypeOf(proxy); // 'proxy' and not 'target'
-            
-            var result = this.keys();
-            if(proto !== null)
-                for (var name in proto) { result.push(name); };
-
-            return result;
+        get events(){
+            throw new Error("A previous implementation used this.events, but it's no longer the case");
+            // TODO report bug FFx no line error when throwing a string
         }
-        // == inheritance-related traps ==
     };
 
+    global.EventedObject = function(target){
+        target = Object(target);
 
-    global.EventedObject = function(proto){
-        proto = proto || null;
-    
-        var handler = new Handler(Object.create(proto));
-        var p = Proxy.create(handler, proto);
-        handler.proxy = p;
-        
-        return p;
+        var proxy = new Proxy(target, handler);
+        targetToProxy.set(target, proxy);
+        return proxy;
     };
-
 
 
 })(this);

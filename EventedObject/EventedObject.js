@@ -5,6 +5,11 @@
  * Object.getOwnPropertyDescriptor(new Proxy({}, {getOwnPropertyDescriptor: function(){return {event: true}} }))
  */
 
+
+var setImmediate = this.setImmediate || function setImmediate(f){
+    setTimeout(f, 0);
+};
+
 (function(global){
     var Object = global.Object;
 
@@ -44,32 +49,29 @@
         var nativeObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
         Object.getOwnPropertyDescriptor = function getOwnPropertyDescriptor(o, name){
             var descMap;
-            var ret;
-
-            if(!objectToGetOwnPropertyDescriptorMap.has(o))
-                objectToGetOwnPropertyDescriptorMap.set(o, new Map());
-            descMap = objectToGetOwnPropertyDescriptorMap.get(o);
-            ret = descMap.get(name);
+            var desc;
 
             try{
                 // call the native function (which traps if o is a proxy)
-                ret = nativeObjectGetOwnPropertyDescriptor(o, name, desc);
+                desc = nativeObjectGetOwnPropertyDescriptor(o, name);
             }
             catch(e){
                 // forward the error if any
                 throw e;
             }
-            finally{
-                // remove the entry
-                descMap.delete(name);
-            }
 
-            return ret;
+            if(!objectToGetOwnPropertyDescriptorMap.has(o))
+                objectToGetOwnPropertyDescriptorMap.set(o, new Map());
+            descMap = objectToGetOwnPropertyDescriptorMap.get(o);
+            desc = descMap.get(name) || desc;
+
+            // TODO remove entry from map
+
+            return desc;
         };
 
 
     })();
-
 
 
     (function(){ // hack to prevent trap invariant from bitching if value has changed
@@ -84,9 +86,6 @@
     })();
 
 
-    var setImmediate = global.setImmediate || function setImmediate(f){
-        setTimeout(f, 0);
-    };
 
 
     /***
@@ -101,43 +100,39 @@
     function EventProperty(eventTarget){
         var listeners = []; // array or null (when event removed from object)
 
-        var eventProp = (function eventProp(){
-            var args = arguments;
-            var self = this;
+        return {
+            fire: function eventProp(){
+                var args = arguments;
+                var self = this;
 
-            if( listeners ){
-                listeners.forEach(function(f){
-                    setImmediate(function(){
-                        f.apply(self, args); // OPEN QUESTION: is this the right way to deal with bound functions?
+                if( listeners ){
+                    listeners.forEach(function(f){
+                        setImmediate(function(){
+                            f.apply(self, args); // OPEN QUESTION: is this the right way to deal with bound functions?
+                        });
                     });
-                });
+                }
+                else{
+                    throw new Error("The event property has been deleted. The event can't be fired anymore.");
+                }
+            },
+            addListener : function addListener(l){
+                if(listeners) // OPEN QUESTION: Should I let it throw instead?
+                    listeners.push(l);
+            },
+            removeListener : function removeListener(f){
+                if(listeners){ // OPEN QUESTION: Should I let it throw instead?
+                    var i = listeners.indexOf(f);
+
+                    return i === -1 ?
+                        false:
+                        delete listeners[i]; // Removes the function, keeps the order of the rest and efficient
+                }
+            },
+            revokeEvent : function revokeEvent(){
+                listeners = null;
             }
-            else{
-                throw new Error("The event property has been deleted. The event can't be fired anymore.");
-            }
-        }).bind(eventTarget);
-
-        // OPEN_QUESTION: What to do if l is already here? toggle? add twice? once and return false?
-        eventProp.addListener = function addListener(l){
-            if(listeners) // OPEN QUESTION: Should I let it throw instead?
-                listeners.push(l);
         };
-
-        eventProp.removeListener = function removeListener(f){
-            if(listeners){ // OPEN QUESTION: Should I let it throw instead?
-                var i = listeners.indexOf(f);
-
-                return i === -1 ?
-                    false:
-                    delete listeners[i]; // Removes the function, keeps the order of the rest and efficient
-            }
-        };
-
-        eventProp.revokeEvent = function(){
-            listeners = null;
-        };
-
-        return eventProp;
     }
 
 
@@ -155,6 +150,15 @@
                 delete eventDesc.value;
                 // keep enumerable and configurable as is
                 eventDesc.event = true;
+
+                // Working around https://bugzilla.mozilla.org/show_bug.cgi?id=601379
+                var descMap;
+                var proxy = targetToProxy.get(target);
+                if(!objectToGetOwnPropertyDescriptorMap.has(proxy))
+                    objectToGetOwnPropertyDescriptorMap.set(proxy, new Map());
+                descMap = objectToGetOwnPropertyDescriptorMap.get(proxy);
+                descMap.set(name, eventDesc);
+                // End of workaround
                 return eventDesc;
             }
             else{ // normal cases

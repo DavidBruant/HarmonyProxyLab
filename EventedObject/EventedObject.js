@@ -86,29 +86,23 @@ var setImmediate = this.setImmediate || function setImmediate(f){
     })();
 
 
-
-
-    /***
-     ** Design decision:
-     ** * return an object with separate functions to allow
-     ** separation of functionalities (especially adding listeners and firing)
-     ** * with fire as [[call]], holding a reference to the object =>
-     ** holding a reference to the event property => being able to fire
-     ** OPEN_QUESTION: Is it a good thing?
-     ** This is handy though. How to allow revokation anyway?
+    /**
+     * Listeners are related to a {target, name} pair
+     * the expression target.name return an EventProperty contextualized to target, but with all event listeners (if
+     * target!==receiver)
      */
     function EventProperty(eventTarget){
         var listeners = []; // array or null (when event removed from object)
 
         return {
-            fire: function eventProp(){
+            fire: function fire(){
                 var args = arguments;
                 var self = this;
 
-                if( listeners ){
+                if(listeners){
                     listeners.forEach(function(f){
                         setImmediate(function(){
-                            f.apply(self, args); // OPEN QUESTION: is this the right way to deal with bound functions?
+                            f.apply(eventTarget, args); // OPEN QUESTION: is this the right way to deal with bound functions?
                         });
                     });
                 }
@@ -117,8 +111,13 @@ var setImmediate = this.setImmediate || function setImmediate(f){
                 }
             },
             addListener : function addListener(l){
-                if(listeners) // OPEN QUESTION: Should I let it throw instead?
-                    listeners.push(l);
+                if(listeners){ // OPEN QUESTION: Should I let it throw instead?
+
+                    if(listeners.indexOf(l) === -1)
+                        listeners.push(l);
+                    else
+                        console.warn('Attempt to register the same listener twice. This attempt failed.');
+                }
             },
             removeListener : function removeListener(f){
                 if(listeners){ // OPEN QUESTION: Should I let it throw instead?

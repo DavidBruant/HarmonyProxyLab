@@ -117,7 +117,94 @@ asyncTest('Removing one listener', function(){
     }, 20);
 });
 
-// adding twice the same listener ?
+asyncTest('The listener |this| value is the object the event was registered on', function(){
+    var o = new EventedObject();
+    Object.defineProperty(o, 'e', {event: true, configurable: false});
+
+    function l1(e){
+        strictEqual(this, o)
+    }
+
+    o.e.addListener(l1);
+    o.e.fire();
+
+    setTimeout(function(){
+        // hopefully we've waited long enough and event firing was scheduled to run before this function (we have no control over that)
+        start();
+    }, 20);
+});
+
+asyncTest('Extracting the fire function', function(){
+    var o = new EventedObject();
+    Object.defineProperty(o, 'e', {event: true, configurable: false});
+
+    var l1Called = false;
+
+    function l1(e){
+        l1Called = true;
+    }
+
+    o.e.addListener(l1);
+    var fire = o.e.fire;
+
+    fire();
+
+    setTimeout(function(){
+        // hopefully we've waited long enough and event firing was scheduled to run before this function (we have no control over that)
+        start();
+    }, 20);
+
+});
+
+// Todo extract fire, delete, fire (should throw)
+
+module('Corner cases')
+
+asyncTest('Adding twice the same listener', function(){
+    var o = new EventedObject();
+    Object.defineProperty(o, 'e', {event: true, configurable: false});
+
+    var l1CalledCount = 0;
+
+    function l1(e){
+        l1CalledCount++;
+    }
+
+    o.e.addListener(l1);
+    o.e.addListener(l1);
+
+    o.e.fire();
+
+    setTimeout(function(){
+        // hopefully we've waited long enough and event firing was scheduled to run before this function (we have no control over that)
+        equal(l1CalledCount, 1);
+        start();
+    }, 20);
+});
+
+asyncTest('Trying to add twice the same listener (only one is actually registered) and removing it', function(){
+    var o = new EventedObject();
+    Object.defineProperty(o, 'e', {event: true, configurable: false});
+
+    var l1CalledCount = 0;
+
+    function l1(e){
+        l1CalledCount++;
+    }
+
+    o.e.addListener(l1);
+    o.e.addListener(l1);
+    o.e.removeListener(l1);
+
+    o.e.fire();
+
+    setTimeout(function(){
+        // hopefully we've waited long enough and event firing was scheduled to run before this function (we have no control over that)
+        equal(l1CalledCount, 0);
+        start();
+    }, 20);
+});
+
 // extracting the fire function
 // deleting the event (if extracted any method should throw)
 // test listener's 'this'

@@ -1,3 +1,13 @@
+/*
+ * Primitive objects are reduced to get/set/has/delete (map with sugar and inheritance)
+ * ES5 objects are proxies wrapping these primitive objects
+ *
+ * Values are stored directly on the target (if data property)
+ * Prop descs are accessed through WeakMap (object) + Map (name) (may be expensive, looking forward to private symbols)
+ *
+ * */
+
+
 (function(global){
     "use strict";
     var Object = global.Object;
@@ -30,17 +40,17 @@
     delete Object.isExtensible;
 
     var proxyToPropDescMap = new WeakMap();
-    var proxyToHandler = new WeakMap();
+    var notExtensibleObjects = new Set(); // ought to be a WeakSet...
+    //var proxyToHandler = new WeakMap();
 
-    function ES5ObjectHandler(){
-        this.extensible = true;
-        this.propDescMap = new Map();
-    }
+    function ES5ObjectHandler(){}
+
     ES5ObjectHandler.prototype =  {
         get: function(target, name, receiver){
             // climb prop chain to find a getter
             // call if found
             // otherwise, get
+            return target[name];
         },
         set: function(target, name, value, receiver){
             console.log('set trap', Array.prototype.slice.call(arguments, 0))
@@ -74,16 +84,13 @@
     /**
      * Each object output of 'new Object()' is a proxy.
      *
-     *
-     *
      */
     // TODO do the same for all object constructors
     function objectConstructor(proto){
-        var target = new Map(); // value storage
+        var target = Object.create(proto); // value storage
         var handler = new ES5ObjectHandler();
         var p = new Proxy(target, handler);
-        proxyToHandler.set(p, handler);
-        proxyToPropDescMap.set(p, handler.propDescMap);
+        proxyToPropDescMap.set(p, new Map());
         return p;
     }
 
@@ -123,15 +130,19 @@
         if(!propDescMap)
             throw new Error("Unsupported object. Did you create it with 'new Object()'?");
 
-        return propDescMap.get(name);
+        return propDescMap.has(name) ?
+            propDescMap.get(name) :
+            {value:o[name], // would be faster if applied to the target directly instead of the proxy, but would require a proxy -> target lookup
+                configurable: true,
+                enumerable: true,
+                writable: true};
     };
 
     ObjectReplacement.preventExtensions = function preventExtensions(o){
-        var handler = proxyToHandler.get(o);
-        if(!handler)
-            throw new Error("Unsupported object. Did you create it with 'new Object()'?");
-
-        handler.extensible = false;
+        return notExtensibleObjects.add(o);
+    };
+    ObjectReplacement.isExtensible = function isExtensible(o){
+        return notExtensibleObjects.has(o);
     };
 
     ObjectReplacement.keys = function keys(o){

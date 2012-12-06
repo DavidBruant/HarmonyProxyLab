@@ -23,13 +23,8 @@
             var o1 = {};
             var o2 = new Object();
 
-            var PROPS = 'azertyuiopqsdfghjklmwxcvbn'.split('');
+            var PROP_NAME = 'azerty';
             var i = 0;
-
-            var options =  {
-                onCycle: function(){ console.log('cycle'); i = (i+1)%(PROPS.length) },
-                onComplete: function(){ console.log("complete"); i = 0; }
-            };
 
             var desc = {
                 value: 37,
@@ -38,22 +33,22 @@
                 writable: true
             };
 
-            var N = 1000000;
+            var suite = new Benchmark.Suite();
 
-            var start;
-
-            for(i=0, start = Date.now() ; i<N ; i++){
-                nativeObjectDefineProperty(o1, PROPS[i%PROPS.length], desc);
-            }
-
-            console.log('native', Date.now() - start);
-
-
-            for(i=0, start = Date.now() ; i<N ; i++){
-                emulatedObjectDefineProperty(o2, PROPS[i%PROPS.length], desc);
-            }
-
-            console.log('emulatedObjectDefineProperty', Date.now() - start);
+            suite.add('nativeObjDefProp', function() {
+                nativeObjectDefineProperty(o1, PROP_NAME, desc);
+            })
+            .add('emulatedObjectDefineProperty', function() {
+                emulatedObjectDefineProperty(o2, PROP_NAME, desc);
+            })
+            .on('cycle', function(){
+                i = 0;
+                console.log('cycle');
+            })
+            .on('complete', function() {
+                console.log('Fastest is ' + this.filter('fastest').pluck('name'));
+            })
+            .run()
 
         })();
     </script>

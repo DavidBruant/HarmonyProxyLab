@@ -5,8 +5,10 @@
  * Values are stored directly on the target (if data property)
  * Prop descs are accessed through WeakMap (object) + Map (name) (may be expensive, looking forward to private symbols)
  *
+ * TODO implement ES5 descriptor algorithms (or rather steal from Tomvc, I think he has written them somewhere already)
+ * TODO import test262 test suite
+ *
  * */
-
 
 (function(global){
     "use strict";
@@ -53,15 +55,12 @@
             return target[name];
         },
         set: function(target, name, value, receiver){
-            console.log('set trap', Array.prototype.slice.call(arguments, 0))
-            if(Object.getPrototypeOf(target)[name] = value)
-                return true;
-            else{
+            console.log('set trap', Array.prototype.slice.call(arguments, 0));
 
+            if(! (name in target) && notExtensibleObjects.has(receiver))
+                throw new TypeError("Can't add a property to a non-extensible object")
 
-            }
-
-
+            setOwnValue(target, name, value);
 
             // if(this.extensible) SetOwnValue(target or receiver?, name, value);
         },
@@ -111,7 +110,7 @@
     ObjectReplacement.create = objectConstructor; // second argument ignored
 
     ObjectReplacement.defineProperty = function defineProperty(o, name, desc){
-        console.log('new Object.defineProperty');
+        //console.log('new Object.defineProperty');
         var propDescMap = proxyToPropDescMap.get(o);
         if(!propDescMap)
             throw new Error("Unsupported object. Did you create it with 'new Object()'?");
@@ -132,17 +131,19 @@
 
         return propDescMap.has(name) ?
             propDescMap.get(name) :
-            {value:o[name], // would be faster if applied to the target directly instead of the proxy, but would require a proxy -> target lookup
+            {
+                value:o[name], // would be faster if applied to the target directly instead of the proxy, but would require a proxy -> target lookup
                 configurable: true,
                 enumerable: true,
-                writable: true};
+                writable: true
+            };
     };
 
     ObjectReplacement.preventExtensions = function preventExtensions(o){
         return notExtensibleObjects.add(o);
     };
     ObjectReplacement.isExtensible = function isExtensible(o){
-        return notExtensibleObjects.has(o);
+        return !notExtensibleObjects.has(o);
     };
 
     ObjectReplacement.keys = function keys(o){

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <script>
+        "use strict";
+        var native = {
+            Object: {
+                defineProperty : Object.defineProperty
+            }
+        };
+    </script>
+
+    <script src="../../benchmark.js/benchmark.js"></script>
+    <script type="text/javascript" src="ES5ObjectModelEmul.js"> </script>
+
+    <script>
+        (function(){
+            "use strict";
+            var nativeObjectDefineProperty = native.Object.defineProperty;
+            var emulatedObjectDefineProperty = Object.defineProperty;
+
+            var o1 = {};
+            var o2 = new Object();
+
+            var PROPS = 'azertyuiopqsdfghjklmwxcvbn'.split('');
+            var i = 0;
+
+            var options =  {
+                onCycle: function(){ console.log('cycle'); i = (i+1)%(PROPS.length) },
+                onComplete: function(){ console.log("complete"); i = 0; }
+            };
+
+            var desc = {
+                value: 37,
+                enumerable: true,
+                configurable: true,
+                writable: true
+            };
+
+            var N = 1000000;
+
+            var start;
+
+            for(i=0, start = Date.now() ; i<N ; i++){
+                nativeObjectDefineProperty(o1, PROPS[i%PROPS.length], desc);
+            }
+
+            console.log('native', Date.now() - start);
+
+
+            for(i=0, start = Date.now() ; i<N ; i++){
+                emulatedObjectDefineProperty(o2, PROPS[i%PROPS.length], desc);
+            }
+
+            console.log('emulatedObjectDefineProperty', Date.now() - start);
+
+        })();
+    </script>
+
+
+    <title> Object.defineProperty Benchmark </title>
+
+</head>
+
+<body>
+</html>

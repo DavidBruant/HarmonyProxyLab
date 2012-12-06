@@ -48,3 +48,36 @@ test('Object.defineProperty data property', function () {
     var descRet = Object.getOwnPropertyDescriptor(o, 'a');
     sameDesc(desc, descRet);
 });
+
+
+
+test('Object.isExtensible', function () {
+    var o = new Object();
+    o.a = 1;
+
+    strictEqual(Object.isExtensible(o), true);
+
+    Object.preventExtensions(o);
+    strictEqual(Object.isExtensible(o), false);
+
+    strictEqual(o.a, 1);
+    o.a = 2;
+    strictEqual(o.a, 2);
+
+    throws(function(){
+        o.b = 2;
+    });
+
+});
+
+
+
+
+
+
+
+
+
+
+
+

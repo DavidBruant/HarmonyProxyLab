@@ -6,19 +6,20 @@
         "use strict";
         var native = {
             Object: {
-                defineProperty : Object.defineProperty
+                defineProperty : Object.defineProperty,
+                getOwnPropertyDescriptor: Object.getOwnPropertyDescriptor
             }
         };
     </script>
 
-    <script src="../../benchmark.js/benchmark.js"></script>
+    <script src="../benchmark.js/benchmark.js"></script>
     <script type="text/javascript" src="ES5ObjectModelEmul.js"> </script>
 
     <script>
         (function(){
             "use strict";
-            var nativeObjectDefineProperty = native.Object.defineProperty;
-            var emulatedObjectDefineProperty = Object.defineProperty;
+
+            var nativeObject = native.Object;
 
             var o1 = {};
             var o2 = new Object();
@@ -33,14 +34,20 @@
                 writable: true
             };
 
+            function nativeBackAndForth(){
+                nativeObject.defineProperty(o1, PROP_NAME, desc);
+                nativeObject.getOwnPropertyDescriptor(o1, PROP_NAME);
+            }
+
+            function emulatedBackAndForth(){
+                Object.defineProperty(o2, PROP_NAME, desc);
+                Object.getOwnPropertyDescriptor(o2, PROP_NAME);
+            }
+
             var suite = new Benchmark.Suite();
 
-            suite.add('nativeObjDefProp', function() {
-                nativeObjectDefineProperty(o1, PROP_NAME, desc);
-            })
-            .add('emulatedObjectDefineProperty', function() {
-                emulatedObjectDefineProperty(o2, PROP_NAME, desc);
-            })
+            suite.add('native', nativeBackAndForth)
+            .add('emulated', emulatedBackAndForth)
             .on('cycle', function(){
                 // console.log('cycle');
                 i = 0;

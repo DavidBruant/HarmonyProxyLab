@@ -27,6 +27,7 @@ function BrowserRunner() {
         errorDetectorFileContents,
         simpleTestAPIContents,
         globalScopeContents,
+        objectEmulationContents,
         harnessDir = "harness/";
 
     $.ajax({async: false,
@@ -40,9 +41,14 @@ function BrowserRunner() {
             url:harnessDir+"sta.js"});
 
     $.ajax({async: false,
-            dataType: "text",
-            success: function(data){globalScopeContents = data;},
-            url:harnessDir+"gs.js"});
+        dataType: "text",
+        success: function(data){globalScopeContents = data;},
+        url:harnessDir+"gs.js"});
+
+    $.ajax({dataType: "text",
+        success: function(data){ objectEmulationContents = data;},
+        error: function(error){ console.log('ES5ObjectModelEmul load fail'); },
+        url:"../../../ES5ObjectModelEmul.js"});
 
     /* Called by the child window to notify that the test has
      * finished. This function call is put in a separate script block
@@ -192,6 +198,14 @@ function BrowserRunner() {
         idoc.writeln("<script type='text/javascript'>");
         idoc.writeln(errorDetectorFileContents);
         idoc.writeln("</script>");
+
+        /** CUSTOM EXTENSION
+         *  to apply tests to my own version of Object
+         */
+        idoc.writeln("<script type='text/javascript'>");
+        idoc.writeln(objectEmulationContents);
+        idoc.writeln("</script>");
+        /** /CUSTOM EXTENSION */
 
         //Run the code
         idoc.writeln("<script type='text/javascript'>");

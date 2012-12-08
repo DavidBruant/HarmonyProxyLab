@@ -42,11 +42,14 @@
                 emulatedObjectDefineProperty(o2, PROP_NAME, desc);
             })
             .on('cycle', function(){
+                // console.log('cycle');
                 i = 0;
-                console.log('cycle');
             })
             .on('complete', function() {
-                console.log('Fastest is ' + this.filter('fastest').pluck('name'));
+                console.log('Results');
+                this.forEach(function(res){
+                    console.log(res.name, res.count);
+                });
             })
             .run()
 

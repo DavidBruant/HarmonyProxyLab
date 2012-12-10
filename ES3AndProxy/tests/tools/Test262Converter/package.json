@@ -1,0 +1,17 @@
+{
+  "name": "Test262Converter",
+  "version": "0.0.0",
+  "description": "A tool to convert all relevant test262 tests for my needs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": "",
+  "author": "David Bruant",
+  "license": "MIT",
+  "dependencies": {
+    "esprima": "~1.0.2",
+    "escodegen": "0.0.15",
+    "q": "~0.8.11"
+  }
+}

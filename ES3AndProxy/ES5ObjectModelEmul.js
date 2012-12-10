@@ -45,9 +45,9 @@
     var notExtensibleObjects = new Set(); // ought to be a WeakSet...
     //var proxyToHandler = new WeakMap();
 
-    function ES5ObjectHandler(){}
+    var isEmulatedObject = proxyToPropDescMap.has.bind(proxyToPropDescMap);
 
-    ES5ObjectHandler.prototype =  {
+    var es5ObjectHandler =  {
         get: function(target, name, receiver){
             // climb prop chain to find a getter
             // call if found
@@ -80,26 +80,31 @@
         }
     };
 
-    /**
-     * Each object output of 'new Object()' is a proxy.
-     *
-     */
-    // TODO do the same for all object constructors
-    function objectConstructor(proto){
-        var target = Object.create(proto); // value storage
-        var handler = new ES5ObjectHandler();
-        var p = new Proxy(target, handler);
-        proxyToPropDescMap.set(p, new Map());
-        return p;
+    function makeEmulated(target){
+        if(Object(target) !== target) // primitive values
+            return target;
+
+        if(isEmulatedObject(target))
+            return target;
+        else{
+            var p = new Proxy(target, es5ObjectHandler);
+            proxyToPropDescMap.set(p, new Map());
+            return p;
+        }
     }
 
-    // TODO make this up to spec. Should behave like Object
-    function ObjectReplacement(){
-        return objectConstructor(Object.prototype);
+    function ObjectReplacement(val){
+        "use strict"; // insisting on strictness so that 'this' defaults to undefined
+        return typeof this === 'object' ?
+            makeEmulated(new Object(val)) : // constructor case (or close enough)
+            makeEmulated(Object(val));      // function case
     }
 
     ObjectReplacement.prototype = Object.prototype;
 
+    ObjectReplacement.makeEmulated = makeEmulated;
+
+    // copy remaining properties
     for(var p in Object){
         if(Object.hasOwnProperty(p)){
             ObjectReplacement[p] = Object[p];
@@ -107,7 +112,9 @@
     }
 
     // replacing native Object.create
-    ObjectReplacement.create = objectConstructor; // second argument ignored
+    ObjectReplacement.create = function(proto, propMap){
+        return makeEmulated(Object.create(proto, propMap));
+    }; // second argument ignored
 
     ObjectReplacement.defineProperty = function defineProperty(o, name, desc){
         //console.log('new Object.defineProperty');
@@ -165,6 +172,20 @@
 
 
     global.Object = ObjectReplacement;
+
+    global.wrapTestObject = function(o){
+        if(typeof o === 'object'){
+            return makeEmulated(o);
+        }
+
+        if(typeof o === 'function'){
+            return function(){
+                return makeEmulated(o.apply(this, arguments));
+            }
+        }
+
+        throw new Error('Not supposed to wrap something else than an object')
+    }
 
 })(this);
 

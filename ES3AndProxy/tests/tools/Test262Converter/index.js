@@ -3,6 +3,12 @@
 var fs = require('fs');
 var Q = require('q');
 var path = require('path');
+var transform = require('./transform.js');
+
+console.log(transform("var a={}, b=bla({}); function f(){}"));
+
+process.exit();
+
 
 function isDir(filename){
     return Q.nfcall(fs.stat, filename)
@@ -47,9 +53,6 @@ function traverse(filepath, dirVisitor, fileVisitor){
 }
 
 
-
-// WTF! No function to delete a directory and its content. That's bullshit.
-// Take a look at rimraf
 
 // TODO delete the test/suite directory before traversing
 

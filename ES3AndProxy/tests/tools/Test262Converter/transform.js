@@ -3,11 +3,24 @@
 var esprima = require('esprima');
 var escodegen = require('escodegen');
 
-var functionCallExpression = "wrapTestObject()";
+function str(x){
+    return JSON.stringify( x, null, '   ');
+}
 
+var functionCallExpression = "wrapTestObject()";
+/**
+ *
+ * @param ast
+ * @return ExpressionStatement which .expression is a CallExpression
+ */
 function wrapNode(ast){
-    var wrapTestObjectCallExpression = esprima.parse(functionCallExpression).body[0].expression;
-    wrapTestObjectCallExpression.arguments.push(ast);
+    var wrapTestObjectCallExpression = esprima.parse(functionCallExpression).body[0];
+
+    if(ast.type === 'FunctionDeclaration'){ // turn it into an equivalent FunctionExpression
+        ast.type = 'FunctionExpression';
+    }
+    wrapTestObjectCallExpression.expression.arguments.push(ast);
+
     return wrapTestObjectCallExpression;
 }
 
@@ -15,6 +28,12 @@ function isObject(x){
     return Object(x) === x;
 }
 
+function replaceExpression(x, i, arr){
+    if(x.type === 'ExpressionStatement')
+        arr[i] = x.expression;
+}
+
+// TODO switch on node.type
 function traverse(node){
     var replacement;
 
@@ -26,15 +45,34 @@ function traverse(node){
     }
 
     for(var p in node){
-        if(typeof node[p] === 'object')
+        if(typeof node[p] === 'object'){
             replacement = traverse(node[p]);
+        }
 
-        if(isObject(replacement))
+        if(isObject(replacement)){
+            // these don't want an ExpressionStatement, but the expression in it
+            if(['VariableDeclarator', 'Property', 'AssignmentExpression'].indexOf(node.type) !== -1)
+                replacement = replacement.expression;
+
             node[p] = replacement;
+        }
+        else{
+            if(node.type === "CallExpression" || node.type === "NewExpression"){ // traverse all arguments to remove the .expression if necessary
+                node.arguments.forEach(replaceExpression);
+            }
+            if(node.type === 'ArrayExpression'){
+                node.elements.forEach(replaceExpression);
+            }
+
+        }
     }
 
-    switch(node.type){
+    switch(node.type){ // nodes to wrap
         case 'ObjectExpression':
+        case 'FunctionDeclaration':
+        case 'FunctionExpression':
+        case 'ArrayExpression':
+        case 'NewExpression':
             return wrapNode(node);
             break;
         default:
@@ -43,17 +81,16 @@ function traverse(node){
 }
 
 function printsrc(s){
-    console.log('\n=====\n', s, '\n=====\n');
+    console.log('=====\n', s, '\n=====\n');
 }
 
 module.exports = function transform(sourceCode){
     var ast = esprima.parse(sourceCode);
 
-    var objDecl = ast;
-    console.log('objDecl', objDecl.body[0].declarations[1].init);
-
-    printsrc(escodegen.generate(ast));
+    //printsrc(escodegen.generate(ast));
     traverse(ast);
-    printsrc(escodegen.generate(ast));
+    //console.log(str(ast));
+    //printsrc(escodegen.generate(ast));
 
+    return escodegen.generate(ast)
 };

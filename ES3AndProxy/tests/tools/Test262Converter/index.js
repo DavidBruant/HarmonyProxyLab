@@ -5,9 +5,11 @@ var Q = require('q');
 var path = require('path');
 var transform = require('./transform.js');
 
-console.log(transform("var a={}, b=bla({}); function f(){}"));
+console.log(transform("var a={yo:{}}, b=bla({}); function C(){} a = function(){};  a = [{}]; a = new C({});"));
 
-process.exit();
+
+
+/*
 
 
 function isDir(filename){
@@ -75,7 +77,7 @@ traverse(originalTestSuitePath,
 );
 
 
-
+*/
 
 
 // Starting at originalTestsPath

@@ -4,7 +4,7 @@ var esprima = require('esprima');
 var escodegen = require('escodegen');
 
 function str(x){
-    return JSON.stringify( x, null, '   ');
+    return JSON.stringify(x, null, '   ');
 }
 
 var functionCallExpression = "wrapTestObject()";
@@ -29,7 +29,7 @@ function isObject(x){
 }
 
 function replaceExpression(x, i, arr){
-    if(x.type === 'ExpressionStatement')
+    if(x !== null && x.type === 'ExpressionStatement')
         arr[i] = x.expression;
 }
 
@@ -51,7 +51,7 @@ function traverse(node){
 
         if(isObject(replacement)){
             // these don't want an ExpressionStatement, but the expression in it
-            if(['VariableDeclarator', 'Property', 'AssignmentExpression'].indexOf(node.type) !== -1)
+            if(['VariableDeclarator', 'Property', 'AssignmentExpression', 'ReturnStatement', 'CallExpression', 'ThrowStatement'].indexOf(node.type) !== -1)
                 replacement = replacement.expression;
 
             node[p] = replacement;
@@ -84,7 +84,12 @@ function printsrc(s){
     console.log('=====\n', s, '\n=====\n');
 }
 
-module.exports = function transform(sourceCode){
+/**
+ * return an equivalent source code where all object literals are wrapped in a wrapTestObject function call
+ * @param sourceCode (string)
+ * @return string
+ */
+function transform(sourceCode){
     var ast = esprima.parse(sourceCode);
 
     //printsrc(escodegen.generate(ast));
@@ -93,4 +98,10 @@ module.exports = function transform(sourceCode){
     //printsrc(escodegen.generate(ast));
 
     return escodegen.generate(ast)
-};
+}
+
+module.exports = transform;
+
+//var src = 'var arrObj = [0, , 2];';
+//console.log('model', str(esprima.parse(src)));
+//console.log(transform(src));

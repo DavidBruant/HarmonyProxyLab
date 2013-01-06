@@ -5,12 +5,6 @@ var Q = require('q');
 var path = require('path');
 var transform = require('./transform.js');
 
-console.log(transform("var a={yo:{}}, b=bla({}); function C(){} a = function(){};  a = [{}]; a = new C({});"));
-
-
-
-/*
-
 
 function isDir(filename){
     return Q.nfcall(fs.stat, filename)
@@ -36,9 +30,10 @@ function traverse(filepath, dirVisitor, fileVisitor){
                     dirVisitor(filepath),
                     Q.nfcall(fs.readdir, filepath)
                         .then(function(files){
-                            //console.log('files', files);
                             files.forEach(function(file){
-                                return traverse(path.join(filepath, file), dirVisitor, fileVisitor);
+                                process.nextTick(function(){
+                                    traverse(path.join(filepath, file), dirVisitor, fileVisitor);
+                                });
                             })
                         })
                         .fail(function(error){
@@ -54,30 +49,35 @@ function traverse(filepath, dirVisitor, fileVisitor){
         })
 }
 
-
-
 // TODO delete the test/suite directory before traversing
 
 traverse(originalTestSuitePath,
     function(dirPath){
         console.log('dirPath', dirPath);
         var dirToBuild = path.join(destinationTestSuitePath, path.relative(originalTestSuitePath, dirPath))
-        Q.nfcall(fs.mkdir, dirToBuild)
+        /*Q.nfcall(fs.mkdir, dirToBuild)
             .then(function(){
                 console.log('Properly built', dirToBuild);
             })
             .fail(function(error){
                 console.log('Error building', dirToBuild, error);
-
             })
+            */
     },
     function(filePath){
-        console.log('traversing', filePath)
+        //console.log('traversing', filePath);
+        Q.nfcall(fs.readFile, filePath)
+            .then(function(fileContent){
+                transform(fileContent);
+            })
+            .fail(function(err){
+                console.log('Error for', filePath, err);
+            })
     }
 );
 
 
-*/
+
 
 
 // Starting at originalTestsPath

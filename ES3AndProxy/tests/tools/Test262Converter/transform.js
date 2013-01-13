@@ -90,14 +90,14 @@ function printsrc(s){
  * @return string
  */
 function transform(sourceCode){
-    var ast = esprima.parse(sourceCode);
+    var ast = esprima.parse(sourceCode, {comment: true});
 
     //printsrc(escodegen.generate(ast));
     traverse(ast);
     //console.log(str(ast));
     //printsrc(escodegen.generate(ast));
 
-    return escodegen.generate(ast)
+    return escodegen.generate(ast, {comment: true})
 }
 
 module.exports = transform;

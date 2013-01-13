@@ -4,7 +4,7 @@ var fs = require('fs');
 var Q = require('q');
 var path = require('path');
 var transform = require('./transform.js');
-
+var rimraf = require('rimraf');
 
 function isDir(filename){
     return Q.nfcall(fs.stat, filename)
@@ -14,10 +14,6 @@ function isDir(filename){
         });
 }
 
-
-// Need a root directory
-// Create an equivalent structure
-// for each file, apply the transform function and output the file
 
 var originalTestSuitePath = __dirname + "/../../ecma262/test/originalSuite";
 var destinationTestSuitePath = __dirname + "/../../ecma262/test/suite";
@@ -51,39 +47,38 @@ function traverse(filepath, dirVisitor, fileVisitor){
 
 // TODO delete the test/suite directory before traversing
 
-traverse(originalTestSuitePath,
-    function(dirPath){
-        console.log('dirPath', dirPath);
-        var dirToBuild = path.join(destinationTestSuitePath, path.relative(originalTestSuitePath, dirPath))
-        /*Q.nfcall(fs.mkdir, dirToBuild)
-            .then(function(){
-                console.log('Properly built', dirToBuild);
-            })
-            .fail(function(error){
-                console.log('Error building', dirToBuild, error);
-            })
-            */
-    },
-    function(filePath){
-        //console.log('traversing', filePath);
-        Q.nfcall(fs.readFile, filePath)
-            .then(function(fileContent){
-                transform(fileContent);
-            })
-            .fail(function(err){
-                console.log('Error for', filePath, err);
-            })
-    }
-);
+Q.nfcall(rimraf, destinationTestSuitePath)
+    .then(function(){
+        traverse(originalTestSuitePath,
+            function(dirPath){
+                //console.log('dirPath', dirPath);
+                var dirToBuild = path.join(destinationTestSuitePath, path.relative(originalTestSuitePath, dirPath));
+                Q.nfcall(fs.mkdir, dirToBuild)
+                    .then(function(){
+                        //console.log('Properly built', dirToBuild);
+                    })
+                    .fail(function(error){
+                        console.log('Error building', dirToBuild, error);
+                    })
+
+            },
+            function(filePath){
+                console.log('traversing', filePath);
+                var fileToCreate = path.join(destinationTestSuitePath, path.relative(originalTestSuitePath, filePath));
+                Q.nfcall(fs.readFile, filePath)
+                    .then(function(fileContent){
+                        return Q.nfcall(fs.writeFile, fileToCreate, transform(fileContent));
+                    })
+                    .fail(function(err){
+                        console.log('Error for', filePath, err);
+                    })
+            }
+        );
+
+    })
+    .fail(function(err){
+        console.log('rimraf error', err);
+    });
 
 
-
-
-
-// Starting at originalTestsPath
-// list all files
-// for each file:
-// if starts with . => ignore
-// if is a directory, create a directory with same relative path.
-// if ends in .js, transform and create file with same relative path and transformed content
 

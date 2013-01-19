@@ -1,21 +1,21 @@
-wrapTestObject(function testcase() {
-    var obj = wrapTestObject({});
-    Object.defineProperty(obj, 'property', wrapTestObject({
-        get: wrapTestObject(function () {
-            return 11;
-        }),
-        configurable: false
-    }));
-    try {
+var testcase = wrapTestObject(function testcase() {
+        var obj = wrapTestObject({});
         Object.defineProperty(obj, 'property', wrapTestObject({
             get: wrapTestObject(function () {
-                return 12;
+                return 11;
             }),
-            configurable: true
+            configurable: false
         }));
-        return false;
-    } catch (e) {
-        return e instanceof TypeError && obj.property === 11;
-    }
-});
+        try {
+            Object.defineProperty(obj, 'property', wrapTestObject({
+                get: wrapTestObject(function () {
+                    return 12;
+                }),
+                configurable: true
+            }));
+            return false;
+        } catch (e) {
+            return e instanceof TypeError && obj.property === 11;
+        }
+    });
 runTestCase(testcase);

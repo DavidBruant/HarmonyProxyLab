@@ -1,14 +1,14 @@
-wrapTestObject(function testcase() {
-    var obj = wrapTestObject({});
-    var accessed = false;
-    var regObj = wrapTestObject(new RegExp());
-    regObj.enumerable = true;
-    Object.defineProperty(obj, 'property', regObj);
-    for (var prop in obj) {
-        if (prop === 'property') {
-            accessed = true;
+var testcase = wrapTestObject(function testcase() {
+        var obj = wrapTestObject({});
+        var accessed = false;
+        var regObj = wrapTestObject(new RegExp());
+        regObj.enumerable = true;
+        Object.defineProperty(obj, 'property', regObj);
+        for (var prop in obj) {
+            if (prop === 'property') {
+                accessed = true;
+            }
         }
-    }
-    return accessed;
-});
+        return accessed;
+    });
 runTestCase(testcase);

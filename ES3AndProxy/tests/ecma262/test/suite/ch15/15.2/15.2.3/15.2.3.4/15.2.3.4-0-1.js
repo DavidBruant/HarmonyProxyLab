@@ -1,6 +1,6 @@
-wrapTestObject(function testcase() {
-    if (typeof Object.getOwnPropertyNames === 'function') {
-        return true;
-    }
-});
+var testcase = wrapTestObject(function testcase() {
+        if (typeof Object.getOwnPropertyNames === 'function') {
+            return true;
+        }
+    });
 runTestCase(testcase);

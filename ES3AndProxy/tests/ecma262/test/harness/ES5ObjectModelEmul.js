@@ -55,14 +55,14 @@
 
     var es5ObjectHandler =  {
         get: function(target, name, receiver){
-            console.log('get trap');
+            //console.log('get trap');
             // climb prop chain to find a getter
             // call if found
             // otherwise, get
             return target[name];
         },
         set: function(target, name, value, receiver){
-            console.log('set trap', Array.prototype.slice.call(arguments, 0));
+            //console.log('set trap', Array.prototype.slice.call(arguments, 0));
 
             if(! (name in target) && notExtensibleObjects.has(receiver))
                 throw new TypeError("Can't add a property to a non-extensible object")
@@ -182,12 +182,12 @@
 
     global.wrapTestObject = function(o){
         if(typeof o === 'object'){
-            console.log('wrapTestObject object');
+            //console.log('wrapTestObject object');
             return makeEmulated(o);
         }
 
         if(typeof o === 'function'){
-            console.log('wrapTestObject function');
+            //console.log('wrapTestObject function');
             return function(){
                 return makeEmulated(o.apply(this, arguments));
             }

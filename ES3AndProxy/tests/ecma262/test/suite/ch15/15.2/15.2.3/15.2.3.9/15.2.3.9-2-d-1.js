@@ -1,7 +1,7 @@
-wrapTestObject(function testcase() {
-    var funObj = wrapTestObject(function () {
-        });
-    Object.freeze(funObj);
-    return Object.isFrozen(funObj);
-});
+var testcase = wrapTestObject(function testcase() {
+        var funObj = wrapTestObject(function () {
+            });
+        Object.freeze(funObj);
+        return Object.isFrozen(funObj);
+    });
 runTestCase(testcase);

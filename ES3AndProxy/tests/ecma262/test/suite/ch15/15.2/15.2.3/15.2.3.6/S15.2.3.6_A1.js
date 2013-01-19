@@ -1,6 +1,6 @@
-wrapTestObject(function getter() {
-    return 'gotten';
-});
+var getter = wrapTestObject(function getter() {
+        return 'gotten';
+    });
 if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
     var f = document.createElement('form');
     var refused = false;

@@ -2,9 +2,9 @@ var __proto = wrapTestObject({ phylum: 'avis' });
 if (!('valueOf' in __proto)) {
     $ERROR('#1: var __proto={phylum:"avis"}; "valueOf" in __proto');
 }
-wrapTestObject(function Robin() {
-    this.name = 'robin';
-});
+var Robin = wrapTestObject(function Robin() {
+        this.name = 'robin';
+    });
 ;
 Robin.prototype = __proto;
 var __my__robin = wrapTestObject(new Robin());

@@ -1,9 +1,9 @@
-wrapTestObject(function testcase() {
-    var arrObj = wrapTestObject([3]);
-    wrapTestObject(function setFunc(value) {
-        arrObj.setVerifyHelpProp = value;
+var testcase = wrapTestObject(function testcase() {
+        var arrObj = wrapTestObject([3]);
+        var setFunc = wrapTestObject(function setFunc(value) {
+                arrObj.setVerifyHelpProp = value;
+            });
+        Object.defineProperty(arrObj, '0', wrapTestObject({ set: setFunc }));
+        return accessorPropertyAttributesAreCorrect(arrObj, '0', undefined, setFunc, 'setVerifyHelpProp', true, true);
     });
-    Object.defineProperty(arrObj, '0', wrapTestObject({ set: setFunc }));
-    return accessorPropertyAttributesAreCorrect(arrObj, '0', undefined, setFunc, 'setVerifyHelpProp', true, true);
-});
 runTestCase(testcase);

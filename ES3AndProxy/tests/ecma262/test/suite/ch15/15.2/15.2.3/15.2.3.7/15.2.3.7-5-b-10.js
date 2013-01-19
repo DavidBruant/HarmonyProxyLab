@@ -1,18 +1,18 @@
-wrapTestObject(function testcase() {
-    var obj = wrapTestObject({});
-    var accessed = false;
-    var proto = wrapTestObject({ enumerable: true });
-    var Con = wrapTestObject(function () {
-        });
-    Con.prototype = proto;
-    var descObj = wrapTestObject(new Con());
-    Object.defineProperty(descObj, 'enumerable', wrapTestObject({ value: false }));
-    Object.defineProperties(obj, wrapTestObject({ prop: descObj }));
-    for (var property in obj) {
-        if (property === 'prop') {
-            accessed = true;
+var testcase = wrapTestObject(function testcase() {
+        var obj = wrapTestObject({});
+        var accessed = false;
+        var proto = wrapTestObject({ enumerable: true });
+        var Con = wrapTestObject(function () {
+            });
+        Con.prototype = proto;
+        var descObj = wrapTestObject(new Con());
+        Object.defineProperty(descObj, 'enumerable', wrapTestObject({ value: false }));
+        Object.defineProperties(obj, wrapTestObject({ prop: descObj }));
+        for (var property in obj) {
+            if (property === 'prop') {
+                accessed = true;
+            }
         }
-    }
-    return !accessed;
-});
+        return !accessed;
+    });
 runTestCase(testcase);

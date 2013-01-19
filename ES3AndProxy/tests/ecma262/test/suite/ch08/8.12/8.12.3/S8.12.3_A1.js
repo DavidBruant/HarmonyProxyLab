@@ -1,5 +1,5 @@
-wrapTestObject(function FooObj() {
-});
+var FooObj = wrapTestObject(function FooObj() {
+    });
 ;
 FooObj.prototype.propFoo = 'some';
 var __obj = wrapTestObject(new FooObj());

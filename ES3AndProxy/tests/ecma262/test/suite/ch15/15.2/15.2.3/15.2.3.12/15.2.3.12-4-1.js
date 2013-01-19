@@ -1,4 +1,4 @@
-wrapTestObject(function testcase() {
-    return !Object.isFrozen(wrapTestObject({}));
-});
+var testcase = wrapTestObject(function testcase() {
+        return !Object.isFrozen(wrapTestObject({}));
+    });
 runTestCase(testcase);

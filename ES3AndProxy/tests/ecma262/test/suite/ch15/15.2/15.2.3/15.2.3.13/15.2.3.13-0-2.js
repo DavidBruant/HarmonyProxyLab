@@ -1,6 +1,6 @@
-wrapTestObject(function testcase() {
-    if (Object.isExtensible.length === 1) {
-        return true;
-    }
-});
+var testcase = wrapTestObject(function testcase() {
+        if (Object.isExtensible.length === 1) {
+            return true;
+        }
+    });
 runTestCase(testcase);

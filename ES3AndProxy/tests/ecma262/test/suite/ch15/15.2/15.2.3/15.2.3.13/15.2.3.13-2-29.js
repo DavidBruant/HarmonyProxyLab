@@ -1,4 +1,4 @@
-wrapTestObject(function testcase() {
-    return Object.isExtensible(fnGlobalObject());
-});
+var testcase = wrapTestObject(function testcase() {
+        return Object.isExtensible(fnGlobalObject());
+    });
 runTestCase(testcase);

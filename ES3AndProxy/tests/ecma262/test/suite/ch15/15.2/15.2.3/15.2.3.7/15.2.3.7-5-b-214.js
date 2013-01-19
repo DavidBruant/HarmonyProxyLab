@@ -1,12 +1,12 @@
-wrapTestObject(function testcase() {
-    var obj = wrapTestObject({});
-    var func = wrapTestObject(function (a, b) {
-            arguments.get = wrapTestObject(function () {
-                return 'arguments';
+var testcase = wrapTestObject(function testcase() {
+        var obj = wrapTestObject({});
+        var func = wrapTestObject(function (a, b) {
+                arguments.get = wrapTestObject(function () {
+                    return 'arguments';
+                });
+                Object.defineProperties(obj, wrapTestObject({ property: arguments }));
+                return obj.property === 'arguments';
             });
-            Object.defineProperties(obj, wrapTestObject({ property: arguments }));
-            return obj.property === 'arguments';
-        });
-    return func();
-});
+        return func();
+    });
 runTestCase(testcase);

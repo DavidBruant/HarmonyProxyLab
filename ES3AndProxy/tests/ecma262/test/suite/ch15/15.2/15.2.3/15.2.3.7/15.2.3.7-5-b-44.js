@@ -1,17 +1,17 @@
-wrapTestObject(function testcase() {
-    var obj = wrapTestObject({});
-    var accessed = false;
-    Object.defineProperties(obj, wrapTestObject({
-        prop: wrapTestObject({
-            enumerable: wrapTestObject(function () {
+var testcase = wrapTestObject(function testcase() {
+        var obj = wrapTestObject({});
+        var accessed = false;
+        Object.defineProperties(obj, wrapTestObject({
+            prop: wrapTestObject({
+                enumerable: wrapTestObject(function () {
+                })
             })
-        })
-    }));
-    for (var property in obj) {
-        if (property === 'prop') {
-            accessed = true;
+        }));
+        for (var property in obj) {
+            if (property === 'prop') {
+                accessed = true;
+            }
         }
-    }
-    return accessed;
-});
+        return accessed;
+    });
 runTestCase(testcase);

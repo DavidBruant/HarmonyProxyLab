@@ -1,6 +1,6 @@
-wrapTestObject(function testcase() {
-    if (Object.getPrototypeOf(URIError) === Function.prototype) {
-        return true;
-    }
-});
+var testcase = wrapTestObject(function testcase() {
+        if (Object.getPrototypeOf(URIError) === Function.prototype) {
+            return true;
+        }
+    });
 runTestCase(testcase);

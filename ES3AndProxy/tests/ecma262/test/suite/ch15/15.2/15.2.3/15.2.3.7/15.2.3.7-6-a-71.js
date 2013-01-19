@@ -1,15 +1,15 @@
-wrapTestObject(function testcase() {
-    var obj = wrapTestObject({});
-    Object.defineProperty(obj, 'foo', wrapTestObject({
-        value: 10,
-        writable: false,
-        configurable: false
-    }));
-    try {
-        Object.defineProperties(obj, wrapTestObject({ foo: wrapTestObject({ writable: true }) }));
-        return false;
-    } catch (e) {
-        return e instanceof TypeError && dataPropertyAttributesAreCorrect(obj, 'foo', 10, false, false, false);
-    }
-});
+var testcase = wrapTestObject(function testcase() {
+        var obj = wrapTestObject({});
+        Object.defineProperty(obj, 'foo', wrapTestObject({
+            value: 10,
+            writable: false,
+            configurable: false
+        }));
+        try {
+            Object.defineProperties(obj, wrapTestObject({ foo: wrapTestObject({ writable: true }) }));
+            return false;
+        } catch (e) {
+            return e instanceof TypeError && dataPropertyAttributesAreCorrect(obj, 'foo', 10, false, false, false);
+        }
+    });
 runTestCase(testcase);

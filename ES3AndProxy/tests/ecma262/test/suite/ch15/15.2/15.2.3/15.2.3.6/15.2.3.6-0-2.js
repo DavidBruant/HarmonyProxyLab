@@ -1,6 +1,6 @@
-wrapTestObject(function testcase() {
-    if (Object.defineProperty.length === 3) {
-        return true;
-    }
-});
+var testcase = wrapTestObject(function testcase() {
+        if (Object.defineProperty.length === 3) {
+            return true;
+        }
+    });
 runTestCase(testcase);

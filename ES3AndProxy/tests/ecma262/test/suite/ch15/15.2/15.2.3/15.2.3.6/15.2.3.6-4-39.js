@@ -1,17 +1,17 @@
-wrapTestObject(function testcase() {
-    var desc = wrapTestObject(new Date());
-    Object.defineProperty(desc, 'foo', wrapTestObject({
-        value: 12,
-        configurable: false
-    }));
-    try {
+var testcase = wrapTestObject(function testcase() {
+        var desc = wrapTestObject(new Date());
         Object.defineProperty(desc, 'foo', wrapTestObject({
-            value: 11,
-            configurable: true
+            value: 12,
+            configurable: false
         }));
-        return false;
-    } catch (e) {
-        return e instanceof TypeError && desc.foo === 12;
-    }
-});
+        try {
+            Object.defineProperty(desc, 'foo', wrapTestObject({
+                value: 11,
+                configurable: true
+            }));
+            return false;
+        } catch (e) {
+            return e instanceof TypeError && desc.foo === 12;
+        }
+    });
 runTestCase(testcase);

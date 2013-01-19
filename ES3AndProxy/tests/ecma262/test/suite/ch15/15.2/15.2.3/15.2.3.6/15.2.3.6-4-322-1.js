@@ -1,22 +1,22 @@
-wrapTestObject(function testcase() {
-    return wrapTestObject(function (a, b, c) {
-        wrapTestObject(function setFunc(value) {
-            this.genericPropertyString = value;
-        });
-        Object.defineProperty(arguments, 'genericProperty', wrapTestObject({
-            set: setFunc,
-            configurable: false
-        }));
-        try {
+var testcase = wrapTestObject(function testcase() {
+        return wrapTestObject(function (a, b, c) {
+            var setFunc = wrapTestObject(function setFunc(value) {
+                    this.genericPropertyString = value;
+                });
             Object.defineProperty(arguments, 'genericProperty', wrapTestObject({
-                set: wrapTestObject(function (value) {
-                    this.genericPropertyString1 = value;
-                })
+                set: setFunc,
+                configurable: false
             }));
-        } catch (e) {
-            return e instanceof TypeError && accessorPropertyAttributesAreCorrect(arguments, 'genericProperty', undefined, setFunc, 'genericPropertyString', false, false, false);
-        }
-        return false;
-    })(1, 2, 3);
-});
+            try {
+                Object.defineProperty(arguments, 'genericProperty', wrapTestObject({
+                    set: wrapTestObject(function (value) {
+                        this.genericPropertyString1 = value;
+                    })
+                }));
+            } catch (e) {
+                return e instanceof TypeError && accessorPropertyAttributesAreCorrect(arguments, 'genericProperty', undefined, setFunc, 'genericPropertyString', false, false, false);
+            }
+            return false;
+        })(1, 2, 3);
+    });
 runTestCase(testcase);

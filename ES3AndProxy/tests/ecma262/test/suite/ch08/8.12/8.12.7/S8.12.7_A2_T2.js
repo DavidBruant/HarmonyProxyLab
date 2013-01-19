@@ -1,5 +1,5 @@
-wrapTestObject(function Palette() {
-});
+var Palette = wrapTestObject(function Palette() {
+    });
 ;
 Palette.prototype = wrapTestObject({
     red: 16711680,

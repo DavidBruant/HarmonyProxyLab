@@ -8,6 +8,7 @@
 if (this.window!==undefined) {  //for console support
     this.window.onerror = function(errorMsg, url, lineNumber) {
         this.window.iframeError = errorMsg;
+        window.top.console.log('iframe err', errorMsg);
     };
 }
 

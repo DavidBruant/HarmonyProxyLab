@@ -48,7 +48,7 @@ function BrowserRunner() {
     $.ajax({dataType: "text",
         success: function(data){ objectEmulationContents = data;},
         error: function(error){ console.log('ES5ObjectModelEmul load fail'); },
-        url:"../../../ES5ObjectModelEmul.js"});
+        url:harnessDir+"ES5ObjectModelEmul.js"});
 
     /* Called by the child window to notify that the test has
      * finished. This function call is put in a separate script block

@@ -14,7 +14,6 @@ function isDir(filename){
         });
 }
 
-
 var originalTestSuitePath = __dirname + "/../../ecma262/test/originalSuite";
 var destinationTestSuitePath = __dirname + "/../../ecma262/test/suite";
 
@@ -67,11 +66,12 @@ Q.nfcall(rimraf, destinationTestSuitePath)
                 var fileToCreate = path.join(destinationTestSuitePath, path.relative(originalTestSuitePath, filePath));
                 Q.nfcall(fs.readFile, filePath)
                     .then(function(fileContent){
-                        return Q.nfcall(fs.writeFile, fileToCreate, transform(fileContent));
+                        var transformedSource = transform(fileContent);
+                        return Q.nfcall(fs.writeFile, fileToCreate, transformedSource);
                     })
                     .fail(function(err){
                         console.log('Error for', filePath, err);
-                    })
+                    });
             }
         );
 

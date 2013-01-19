@@ -1,35 +1,20 @@
-/// Copyright (c) 2012 Ecma International.  All rights reserved. 
-/// Ecma International makes this code available under the terms and conditions set
-/// forth on http://hg.ecmascript.org/tests/test262/raw-file/tip/LICENSE (the 
-/// "Use Terms").   Any redistribution of this code must retain the above 
-/// copyright and this notice and otherwise comply with the Use Terms.
-/**
- * @path ch15/15.2/15.2.3/15.2.3.12/15.2.3.12-2-a-5.js
- * @description Object.isFrozen - 'P' is own accessor property that overrides an inherited data property
- */
-
-
-function testcase() {
-
-        var proto = {};
-
-        Object.defineProperty(proto, "foo", {
-            value: 12,
-            configurable: false
+wrapTestObject(function testcase() {
+    var proto = wrapTestObject({});
+    Object.defineProperty(proto, 'foo', wrapTestObject({
+        value: 12,
+        configurable: false
+    }));
+    var Con = wrapTestObject(function () {
         });
-
-        var Con = function () { };
-        Con.prototype = proto;
-        var child = new Con();
-
-        Object.defineProperty(child, "foo", {
-            get: function () {
-                return 9;
-            },
-            configurable: true
-        });
-
-        Object.preventExtensions(child);
-        return !Object.isFrozen(child);
-    }
+    Con.prototype = proto;
+    var child = wrapTestObject(new Con());
+    Object.defineProperty(child, 'foo', wrapTestObject({
+        get: wrapTestObject(function () {
+            return 9;
+        }),
+        configurable: true
+    }));
+    Object.preventExtensions(child);
+    return !Object.isFrozen(child);
+});
 runTestCase(testcase);

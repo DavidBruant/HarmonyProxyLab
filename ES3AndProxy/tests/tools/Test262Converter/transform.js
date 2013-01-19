@@ -90,18 +90,14 @@ function printsrc(s){
  * @return string
  */
 function transform(sourceCode){
-    var ast = esprima.parse(sourceCode, {comment: true});
+    // My transformations aren't compatible with esprima+escodegen comments (something about ranges)
+    var ast = esprima.parse(sourceCode/*, {range: true, tokens: true, comment: true}*/);
 
-    //printsrc(escodegen.generate(ast));
     traverse(ast);
-    //console.log(str(ast));
-    //printsrc(escodegen.generate(ast));
 
-    return escodegen.generate(ast, {comment: true})
+    //ast = escodegen.attachComments(ast, ast.comments, ast.tokens);
+    return escodegen.generate(ast/*, {comment: true}*/)
 }
 
 module.exports = transform;
 
-//var src = 'var arrObj = [0, , 2];';
-//console.log('model', str(esprima.parse(src)));
-//console.log(transform(src));

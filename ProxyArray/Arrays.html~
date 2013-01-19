@@ -1,0 +1,43 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+
+    <script type="text/javascript" src="ForwardingProxy.js"> </script>
+    <script type="text/javascript" src="ProxyArray.js"> </script>
+
+    <script type="text/javascript">
+        var a = proxyArray();
+
+        a[0] = 'a';
+        console.log(a[0]);
+        console.log(a.length);
+        
+        a[1] = 32;
+        console.log(a[1]);
+        console.log(a.length);
+        
+        a[13] = 12345;
+        console.log(a[13]);
+        console.log(a.length);
+        
+        a.length = 10;
+        console.log(a[13]);
+        console.log(a.length);
+
+
+        var b = proxyArray(-1, 0, 1, 2, 3, 4);
+        console.log(b.some(function(e){return e>0;}));
+        
+    </script>
+
+
+    <title> Array Reimpl with proxies </title>
+
+  </head>
+
+  <body>
+
+  </body>
+</html>

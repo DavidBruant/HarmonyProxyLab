@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+
+        <link rel="stylesheet" href="../qunit.css" type="text/css" media="screen">
+                
+        <script type="text/javascript" src="../jquery.js"> </script>
+        <script type="text/javascript" src="../qunit.js"> </script>
+
+        <script type="text/javascript" src="../DirectProxies.js"> </script>        
+        <script type="text/javascript" src="Versionned.js"> </script>
+
+        <script type="text/javascript">
+        QUnit.is = function(x, y) {
+            if (x === y) {
+                // -0 and +0 are different values  
+                return x !== 0 || 1 / x === 1 / y;
+            }
+            
+            // if x !== y, it's still possible that x and y are NaN
+            return x !== x && y !== y;
+        }
+        
+        
+        QUnit.sameDescriptor = function(pd1, pd2){            
+            return pd1 === pd2 ||
+                   (pd1 && pd2 &&
+                   Object.keys(pd1).every(function(attr){
+                       return QUnit.is(pd1[attr], pd2[attr]);
+                   }));
+        }
+        
+        
+        QUnit.sameObjects = function(o1, o2){
+            var sameProto = Object.getPrototypeOf(o1) === Object.getPrototypeOf(o2);
+            
+            var o1Names = Object.getOwnPropertyNames(o1),
+                o2Names = Object.getOwnPropertyNames(o2);
+                
+            var sameProperties = o1Names.length === o2Names.length &&
+                                 o1Names.every(function(name){
+                                     return QUnit.sameDescriptor(Object.getOwnPropertyDescriptor(o1, name),
+                                                                 Object.getOwnPropertyDescriptor(o2, name));
+                                 });
+                                 
+            var sameClass = Object.prototype.toString.call(o1) === Object.prototype.toString.call(o2);
+            var sameExtensible = Object.isExtensible(o1) === Object.isExtensible(o2);
+            
+            return sameProto && sameProperties && sameClass && sameExtensible;
+        }
+        </script>
+
+
+        <script type="text/javascript">
+        (function(){
+            "use strict";
+            var p = Proxy({}, {});
+            
+            Object.defineProperty(p, 'a', {value:1, configurable: false});
+            
+            try{
+                delete p.a;
+                console.log('no error thrown');
+            }
+            catch(e){
+                console.log('error thrown: '+e);
+            }
+            
+        })();
+        </script>
+
+
+
+
+
+
+        <script type="text/javascript">
+        "use strict";
+        
+        $(function(){
+            
+            /*****/
+            module("Versionned - Basic tests");
+            
+            test("Existence", function() {
+                ok(typeof Versionned === 'function');
+            });
+            
+            test("Return value", function() {
+                var o = {};    
+                var v = new Versionned(o);
+                
+                ok(typeof v === 'object', "A versionned is an object")
+                ok(typeof v.recorded === 'object', "typeof o.recorded");
+                
+                // ok(Array.isArray(v.snapshots), "Array.isArray(v.snapshots) (IMPOSSIBLE WITHOUT DIRECT PROXIES)");
+            });
+
+
+            /*****/
+            module("Versionned.recorded looks like the original object");
+            // TODO test inherited getters and setters
+            
+            
+            test("Own property get", function(){
+                expect(6);
+                
+                var o = {a:1,
+                         b:NaN,
+                         c:undefined,
+                         d:null,
+                         get e(){
+                            ok(true, "recorded calls getters");
+                         },
+                         set f(val){
+                            ok(val === 37, "recorded calls setters with correct value");
+                         }},
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+                    
+                ok(recorded.a === o.a, "Property value is a number");
+                ok(isNaN(recorded.b), "Property value is NaN");
+                ok(Object.prototype.hasOwnProperty.call(recorded, 'c') && recorded.c === undefined, 
+                   "Property value is undefined");
+                ok(recorded.d === null, "Property value is null");
+            
+                var e = recorded.e; // supposed to call a getter
+                recorded.f = 37;
+                
+            });
+            
+            test("Inherited property get", function(){
+                expect(4);
+                
+                var o = Object.create({a:1,
+                                       get b(){
+                                          ok(this === recorded, "recorded calls inherited getters");
+                                       }}),
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+
+                ok('a' in recorded && recorded.a === o.a, 'inherited properties are properly read');
+                ok(Object.prototype.hasOwnProperty.call(recorded, 'a') === false, 'Inherited properties are not considered as own');
+                ok(o.toString() === recorded.toString(), "Origin and recorded have similar toString");
+                
+                var b = recorded.b; // Supposed to call the inherited getter
+            });
+            
+            test("Recorded object respects original object invariants - Normal objects", function(){
+                var o = Object.create({}),
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+            
+                ok(Object.getPrototypeOf(recorded) === Object.getPrototypeOf(o), "Origin and recorded have same [[Prototype]]");
+                ok(typeof recorded === 'object', "typeof recorded === 'object'");
+                ok(Object.isExtensible(recorded) === true, "recorded is extensible (origin was not either)");
+            });
+            
+            
+            test("Recorded object respects original object invariants - array", function(){
+                var o = [],
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+
+                //ok(Array.isArray === true, "recorded is an Array (IMPOSSIBLE WITHOUT DIRECT PROXIES)");
+                ok(Object.getPrototypeOf(recorded) === Object.getPrototypeOf(o), "Origin and recorded have same [[Prototype]]");
+                ok(typeof recorded === 'object', "typeof recorded === 'object'");
+                
+                // add a test about non-configurable length
+            });
+            
+            
+            /*
+            test("Recorded object respects original object invariants - function", function(){
+
+            });
+            test("Recorded object respects original object invariants - global object", function(){
+
+            });
+            test("Recorded object respects original object invariants - document object", function(){
+
+            });
+            test("Recorded object respects original object invariants - DOM node object", function(){
+
+            });
+            test("Recorded object respects original object invariants - DOM style object", function(){
+
+            });
+            */
+            
+            
+            test("Object.preventExtensions is propagated to the original object", function(){
+                var o = {a:1},
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+            
+                ok(Object.isExtensible(recorded) === true, "recorded is initially extensible");
+                
+                Object.preventExtensions(recorded);
+                ok(Object.isExtensible(recorded) === false, "recorded can be made non-extensible");
+                ok(Object.isExtensible(o) === false, "Object.preventExtensions is propagated to the original object");
+            
+            });
+            
+            test("Setting a value property", function(){
+                var o = {a:1},
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+                    
+                // Set
+                recorded.b = 2;
+                
+                ok(recorded.b === 2, "Property added to recorded"); 
+                ok(recorded.b === o.b, "Property added to the original object as well");
+                
+                // defineProperty
+                Object.defineProperty(recorded, 'c', {value: 3, configurable:true});
+                ok(o.c === 3, "Property added to the original object with Object.defineProperty");
+                
+                var descO = Object.getOwnPropertyDescriptor(o, 'c');
+                var descRecorded = Object.getOwnPropertyDescriptor(recorded, 'c');
+                
+                ok(descO.value === descRecorded.value, "Same value");
+                ok(descO.configurable === descRecorded.configurable, "Same configurable");
+                ok(descO.writable === descRecorded.writable, "Same writable");
+                ok(descO.enumerable === descRecorded.enumerable, "Same enumerable");
+                
+                recorded.a = 4;
+                
+                ok(recorded.a === 4, "Changing value of a property existing in the original object");
+                ok(recorded.a === o.a, "Changing value of a property existing in the original object"+
+                                       " is propagated to the original object");
+            });
+            
+            test("Adding a non-configurable property", function(){
+                var o = {},
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+                
+                
+                Object.defineProperty(recorded, 'a', {value: 1, configurable:false});
+                
+                var descO = Object.getOwnPropertyDescriptor(o, 'a');
+                var descRecorded = Object.getOwnPropertyDescriptor(recorded, 'a');
+                
+                ok(descO.configurable === false, "Property on original object is non-configurable");
+                ok(descRecorded.configurable === false, "Property on original object is non-configurable "+
+                                                        "(impossible without direct proxies)");
+                
+                
+            });
+            
+            test("Adding a setter", function(){                
+                var o = {},
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+                
+                Object.defineProperty(recorded, 'b', {set:function(val){},
+                                                      enumerable: true});
+                                                          
+                var descO = Object.getOwnPropertyDescriptor(o, 'b');
+                var descRecorded = Object.getOwnPropertyDescriptor(recorded, 'b');
+                
+                ok(descO.get === descRecorded.get, "Same get");
+                ok(descO.set === descRecorded.set, "Same set");
+                ok(descO.configurable === descRecorded.configurable, "Same configurable");
+                ok(descO.enumerable === descRecorded.enumerable, "Same enumerable");
+            });
+            
+            test("Replacing a setter", function(){
+                expect(6);
+                var o = {set a(val){
+                             ok(false, "Original setter called (while it should have been replaced)")
+                         }},
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+                
+                Object.defineProperty(recorded, 'a', {set:function(val){
+                                                              var objStr = undefined;
+                                                              if(this === recorded)
+                                                                  objStr = "recorded object";
+                                                              if(this === o)
+                                                                  objStr = "original object";
+                
+                                                              ok(typeof objStr === 'string', "Correct setter called with "+objStr);
+                                                          },
+                                                      enumerable: true});
+                                                          
+                var descO = Object.getOwnPropertyDescriptor(o, 'a');
+                var descRecorded = Object.getOwnPropertyDescriptor(recorded, 'a');
+                
+                ok(descO.get === descRecorded.get, "Same get");
+                ok(descO.set === descRecorded.set, "Same set");
+                ok(descO.configurable === descRecorded.configurable, "Same configurable");
+                ok(descO.enumerable === descRecorded.enumerable, "Same enumerable");
+                
+                recorded.a = 12;
+                o.a = 13;
+            });
+            
+            test("Deleting properties", function(){
+                var o = {a:1,
+                         get b(){}},
+                    v = new Versionned(o),
+                    recorded = v.recorded;
+                
+                Object.defineProperty(o, 'c', {value: 2, configurable: false});
+                
+                delete recorded.a;
+                delete recorded.b;
+                
+                ok('a' in recorded === false, "Deletion of value properties in recorded object");
+                ok('b' in recorded === false, "Deletion of accessor properties in recorded object");
+                
+                ok('a' in o === false, "Deletion of value properties is propagated to the original object");
+                ok('b' in o === false, "Deletion of accessor properties is propagated to the original object");
+
+                try{
+                    delete recorded.c;
+                    ok(false, "Trying to delete a non-configurable property on the recorded object should throw (strict mode)");
+                }
+                catch(e){
+                    ok('c' in recorded && recorded.c === 2, "Non-configurable properties can't be deleted in recorded");
+                }
+            });
+            
+            
+            /*****/
+            module("ChangeListener called when needed");
+            
+            test("Adding properties", function(){
+                expect(1000);
+                var o = {};
+                var v = new Versionned(o, function(){
+                    ok(true, "A change has been heard");
+                });
+
+                var recorded = v.recorded;
+            
+                recorded.a = 1;
+            
+                Object.defineProperty(recorded, 'b', {value: 2});
+                Object.defineProperty(recorded, 'c', {get: function(){}, set:function(){}});
+            
+            });
+            
+            
+        });
+        </script>
+
+        <title>Versionned objects</title>
+    </head>
+    
+    <body>
+
+        <h1 id="qunit-header">QUnit example</h1>
+        <h2 id="qunit-banner"></h2>
+        <div id="qunit-testrunner-toolbar"></div>
+
+        <h2 id="qunit-userAgent"></h2>
+
+        <ol id="qunit-tests"></ol>
+
+        <div id="qunit-fixture">test markup, will be hidden</div>
+    
+    </body>
+</html>

@@ -1,5 +1,5 @@
 "use strict";
-// wrap all object, array and function declarations in a function called wrapTestObject
+
 var esprima = require('esprima');
 var escodegen = require('escodegen');
 
@@ -85,7 +85,7 @@ function printsrc(s){
 }
 
 /**
- * return an equivalent source code where all object literals are wrapped in a wrapTestObject function call
+ * wraps all object, array and function declarations in a function called wrapTestObject
  * @param sourceCode (string)
  * @return string
  */

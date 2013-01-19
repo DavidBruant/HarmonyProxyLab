@@ -22,7 +22,7 @@ def stripStars(text):
 
 def convertDocString(docString):
     envelope = {}
-    temp = captureCommentPattern.findall(docString)[0]
+    """temp = captureCommentPattern.findall(docString)[0]
     propTexts = atattrs.split(temp)
     envelope['commentary'] = stripStars(propTexts[0])
     del propTexts[0]
@@ -42,7 +42,7 @@ def convertDocString(docString):
         
         if propName in envelope:
             raise Exception('duplicate: ' + propName)
-        envelope[propName] = propVal;
+        envelope[propName] = propVal;"""
     return envelope
 
 #--MAIN------------------------------------------------------------------------

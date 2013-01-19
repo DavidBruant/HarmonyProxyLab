@@ -8,20 +8,34 @@ function str(x){
 }
 
 var functionCallExpression = "wrapTestObject()";
+var functionVarDeclaration = "var XXXXX = YYYYY()";
 /**
  *
  * @param ast
  * @return ExpressionStatement which .expression is a CallExpression
  */
 function wrapNode(ast){
+    var replacement;
     var wrapTestObjectCallExpression = esprima.parse(functionCallExpression).body[0];
 
     if(ast.type === 'FunctionDeclaration'){ // turn it into an equivalent FunctionExpression
-        ast.type = 'FunctionExpression';
-    }
-    wrapTestObjectCallExpression.expression.arguments.push(ast);
+        var functionVarDeclarationReplacement = esprima.parse(functionVarDeclaration).body[0];
+        functionVarDeclarationReplacement.declarations[0].id.name = ast.id.name; // name of the variable is the name of the declared function
 
-    return wrapTestObjectCallExpression;
+        // turn the function declaration into an equivalent function expression and wrap it
+        ast.type = 'FunctionExpression';
+        wrapTestObjectCallExpression.expression.arguments.push(ast);
+
+        // use the wrapped result as value for the var declaration
+        functionVarDeclarationReplacement.declarations[0].init = wrapTestObjectCallExpression.expression;
+        replacement = functionVarDeclarationReplacement;
+    }
+    else{
+        wrapTestObjectCallExpression.expression.arguments.push(ast);
+        replacement = wrapTestObjectCallExpression;
+    }
+
+    return replacement;
 }
 
 function isObject(x){
@@ -94,10 +108,10 @@ function transform(sourceCode){
     var ast = esprima.parse(sourceCode/*, {range: true, tokens: true, comment: true}*/);
 
     traverse(ast);
+    //console.log('output ast', str(ast));
 
     //ast = escodegen.attachComments(ast, ast.comments, ast.tokens);
     return escodegen.generate(ast/*, {comment: true}*/)
 }
 
 module.exports = transform;
-

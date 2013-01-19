@@ -5,8 +5,9 @@
  * Values are stored directly on the target (if data property)
  * Prop descs are accessed through WeakMap (object) + Map (name) (may be expensive, looking forward to private symbols)
  *
- * TODO implement ES5 descriptor algorithms (or rather steal from Tomvc, I think he has written them somewhere already)
- * TODO import test262 test suite
+ * A lot of code has been copied from https://github.com/tvcutsem/harmony-reflect/blob/master/reflect.js. Copyright header:
+ * // Copyright (C) 2011-2012 Software Languages Lab, Vrije Universiteit Brussel
+ * // This code is dual-licensed under both the Apache License and the MPL
  *
  * */
 
@@ -47,7 +48,8 @@
     delete Object.isFrozen;
     delete Object.isExtensible;
 
-    var proxyToPropDescMap = new WeakMap();
+    var targetToPropDescMap = new WeakMap();
+    var proxyToTarget = new WeakMap();
     var notExtensibleObjects = new Set(); // ought to be a WeakSet...
     //var proxyToHandler = new WeakMap();
 
@@ -55,14 +57,14 @@
 
     var es5ObjectHandler =  {
         get: function(target, name, receiver){
-            console.log('get trap');
+            //console.log('get trap');
             // climb prop chain to find a getter
             // call if found
             // otherwise, get
             return target[name];
         },
         set: function(target, name, value, receiver){
-            console.log('set trap', Array.prototype.slice.call(arguments, 0));
+            //console.log('set trap', Array.prototype.slice.call(arguments, 0));
 
             if(! (name in target) && notExtensibleObjects.has(receiver))
                 throw new TypeError("Can't add a property to a non-extensible object")
@@ -95,7 +97,8 @@
             return target;
         else{
             var p = new Proxy(target, es5ObjectHandler);
-            proxyToPropDescMap.set(p, new Map());
+            proxyToTarget.set(p, target);
+            targetToPropDescMap.set(target, new Map()); // this map could as well be an object
             return p;
         }
     }
@@ -125,9 +128,10 @@
 
     ObjectReplacement.defineProperty = function defineProperty(o, name, desc){
         //console.log('new Object.defineProperty');
-        var propDescMap = proxyToPropDescMap.get(o);
-        if(!propDescMap)
+        var target = proxyToTarget.get(o);
+        if(!target)
             throw new Error("Unsupported object. Did you create it with 'new Object()'?");
+        var propDescMap = targetToPropDescMap.get(o);
 
         var propDesc = propDescMap.get(name);
         propDesc = propDesc || {};
@@ -139,9 +143,10 @@
     };
 
     ObjectReplacement.getOwnPropertyDescriptor = function getOwnPropertyDescriptor(o, name){
-        var propDescMap = proxyToPropDescMap.get(o);
-        if(!propDescMap)
+        var target = proxyToTarget.get(o);
+        if(!target)
             throw new Error("Unsupported object. Did you create it with 'new Object()'?");
+        var propDescMap = targetToPropDescMap.get(o);
 
         return propDescMap.has(name) ?
             propDescMap.get(name) :
@@ -161,9 +166,10 @@
     };
 
     ObjectReplacement.keys = function keys(o){
-        var propDescMap = proxyToPropDescMap.get(o);
-        if(!propDescMap)
+        var target = proxyToTarget.get(o);
+        if(!target)
             throw new Error("Unsupported object. Did you create it with 'new Object()'?");
+        var propDescMap = targetToPropDescMap.get(o);
 
         var ret = [];
 
@@ -182,12 +188,12 @@
 
     global.wrapTestObject = function(o){
         if(typeof o === 'object'){
-            console.log('wrapTestObject object');
+            //console.log('wrapTestObject object');
             return makeEmulated(o);
         }
 
         if(typeof o === 'function'){
-            console.log('wrapTestObject function');
+            //console.log('wrapTestObject function');
             return function(){
                 return makeEmulated(o.apply(this, arguments));
             }

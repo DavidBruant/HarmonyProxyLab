@@ -14,12 +14,14 @@
 (function(global){
     "use strict";
     var Object = global.Object;
-    var console = {
-        log: function(){
-            var topConsole = window.top.console;
-            topConsole.log.apply(topConsole, ['test iframe:'].concat(arguments))
-        }
-    };
+    if(window.top !== window){
+        global.console = {
+            log: function(){
+                var topConsole = window.top.console;
+                topConsole.log.apply(topConsole, ['test iframe:'].concat(arguments))
+            }
+        };
+    }
 
     // Encapsulating the Object.defineProperty capability to set a value as own property
     var setOwnValue = (function(){
@@ -50,18 +52,83 @@
 
     var targetToPropDescMap = new WeakMap();
     var proxyToTarget = new WeakMap();
+    var targetToProxy = new WeakMap();
     var notExtensibleObjects = new Set(); // ought to be a WeakSet...
     //var proxyToHandler = new WeakMap();
 
-    var isEmulatedObject = proxyToPropDescMap.has.bind(proxyToPropDescMap);
+    // copied from http://wiki.ecmascript.org/doku.php?id=harmony:egal
+    function sameValue(x, y) {
+        if (x === y) {
+            // 0 === -0, but they are not identical
+            return x !== 0 || 1 / x === 1 / y;
+        }
+
+        // NaN !== NaN, but they are identical.
+        // NaNs are the only non-reflexive value, i.e., if x !== x,
+        // then x is a NaN.
+        // isNaN is broken: it converts its argument to number, so
+        // isNaN("foo") => true
+        return x !== x && y !== y;
+    }
+    function isAccessorDescriptor(desc) {
+        if (desc === undefined) return false;
+        return ('get' in desc || 'set' in desc);
+    }
+    function isDataDescriptor(desc) {
+        if (desc === undefined) return false;
+        return ('value' in desc || 'writable' in desc);
+    }
+    function isGenericDescriptor(desc) {
+        if (desc === undefined) return false;
+        return !isAccessorDescriptor(desc) && !isDataDescriptor(desc);
+    }
+    function isEmptyDescriptor(desc) {
+        return !('get' in desc) &&
+            !('set' in desc) &&
+            !('value' in desc) &&
+            !('writable' in desc) &&
+            !('enumerable' in desc) &&
+            !('configurable' in desc);
+    }
+
+    function isEquivalentDescriptor(desc1, desc2) {
+        return sameValue(desc1.get, desc2.get) &&
+            sameValue(desc1.set, desc2.set) &&
+            sameValue(desc1.value, desc2.value) &&
+            sameValue(desc1.writable, desc2.writable) &&
+            sameValue(desc1.enumerable, desc2.enumerable) &&
+            sameValue(desc1.configurable, desc2.configurable);
+    }
+
+
+
+    var isEmulatedObject = proxyToTarget.has.bind(proxyToTarget);
 
     var es5ObjectHandler =  {
         get: function(target, name, receiver){
-            //console.log('get trap');
-            // climb prop chain to find a getter
-            // call if found
-            // otherwise, get
-            return target[name];
+            receiver = receiver || target;
+
+            var propDescMap = targetToPropDescMap.get(target);
+            if(!propDescMap)
+                throw new Error("Unsupported object. Did you create it with 'new Object()'?");
+            var desc = propDescMap.get(name);
+
+            if (desc === undefined) {
+                var proto = ObjectReplacement.getPrototypeOf(target);
+                if (proto === null) {
+                    return undefined;
+                }
+                proto = proxyToTarget.get(proto) || proto;
+                return this.get(proto, name, receiver);
+            }
+            if (isDataDescriptor(desc)) {
+                return desc.value;
+            }
+            var getter = desc.get;
+            if (getter === undefined) {
+                return undefined;
+            }
+            return desc.get.call(receiver);
         },
         set: function(target, name, value, receiver){
             //console.log('set trap', Array.prototype.slice.call(arguments, 0));
@@ -74,31 +141,48 @@
             // if(this.extensible) SetOwnValue(target or receiver?, name, value);
         },
         delete: function(target, name){
-            var desc = this.propDescMap.get(name);
-            if(desc.configurable === false){
+            var target = proxyToTarget.get(o);
+            if(!target)
+                throw new Error("Unsupported object. Did you create it with 'new Object()'?");
+            var propDescMap = targetToPropDescMap.get(target);
+            var desc = propDescMap.get(name);
+
+            if(desc && desc.configurable === false){
                 throw new Error(['Property', name, 'is not configurable, so it cannot be deleted'].join(' '))
             }
-            this.propDescMap.remove(name);
+            propDescMap.remove(name);
             return delete target[name];
-        },
-        has: function(target, name){
-
-        },
-        enumerate: function(target){
-
         }
     };
 
     function makeEmulated(target){
-        if(Object(target) !== target) // primitive values
+        //console.log('makeEmulated')
+        if(Object(target) !== target){ // primitive values
+            console.log('makeEmulated primitive', typeof target);
             return target;
+        }
 
-        if(isEmulatedObject(target))
+        if(isEmulatedObject(target)){
+            console.log('makeEmulated true');
             return target;
+        }
+
+        var existingProxy = targetToProxy.get(target);
+        if(existingProxy){
+            console.log('makeEmulated existing proxy');
+            return existingProxy;
+        }
         else{
+            console.log('makeEmulated new');
             var p = new Proxy(target, es5ObjectHandler);
             proxyToTarget.set(p, target);
-            targetToPropDescMap.set(target, new Map()); // this map could as well be an object
+            targetToProxy.set(target, p);
+            var propDescMap = new Map();
+            Object.getOwnPropertyNames(target).forEach(function(name){
+                propDescMap.set(name, {value: target[name], configurable: true, writable: true, enumerable: true});
+            });
+
+            targetToPropDescMap.set(target, propDescMap); // this map could as well be an object
             return p;
         }
     }
@@ -111,42 +195,90 @@
     }
 
     ObjectReplacement.prototype = Object.prototype;
-
-    ObjectReplacement.makeEmulated = makeEmulated;
-
-    // copy remaining properties
-    for(var p in Object){
-        if(Object.hasOwnProperty(p)){
-            ObjectReplacement[p] = Object[p];
-        }
-    }
-
-    // replacing native Object.create
+    ObjectReplacement.getPrototypeOf = function getPrototypeOf(o){
+        return makeEmulated(Object.getPrototypeOf(o)); // some identity issues, but whatever?
+    };
     ObjectReplacement.create = function(proto, propMap){
         return makeEmulated(Object.create(proto, propMap));
-    }; // second argument ignored
+    };
+    ObjectReplacement.makeEmulated = makeEmulated;
+
 
     ObjectReplacement.defineProperty = function defineProperty(o, name, desc){
-        //console.log('new Object.defineProperty');
+        console.log('new Object.defineProperty');
         var target = proxyToTarget.get(o);
         if(!target)
             throw new Error("Unsupported object. Did you create it with 'new Object()'?");
-        var propDescMap = targetToPropDescMap.get(o);
+        var propDescMap = targetToPropDescMap.get(target);
+        var currentDesc = propDescMap.get(name);
 
-        var propDesc = propDescMap.get(name);
-        propDesc = propDesc || {};
-
-        // TODO look up the spec for exact Object.defineProperty
-        // make sure to consider [[extensible]]
-        // For now, it'll just replace the current propdesc
+        var extensible = !notExtensibleObjects.has(target);
+        if (currentDesc === undefined && extensible === false) {
+            throw new TypeError('non-extensible')
+        }
+        if (currentDesc === undefined && extensible === true) {
+            setOwnValue(target, name, desc.value);
+            propDescMap.set(name, desc);
+            return o;
+        }
+        if (isEmptyDescriptor(desc) || isEquivalentDescriptor(currentDesc, desc)) {
+            return o;
+        }
+        if (currentDesc.configurable === false) {
+            if (desc.configurable === true) {
+                throw new TypeError('non-configurable')
+            }
+            if ('enumerable' in desc && desc.enumerable !== currentDesc.enumerable) {
+                throw new TypeError('non-configurable')
+            }
+        }
+        if (isGenericDescriptor(desc)) {
+            // no further validation necessary
+        } else if (isDataDescriptor(currentDesc) !== isDataDescriptor(desc)) {
+            if (currentDesc.configurable === false) {
+                throw new TypeError('non-configurable, incompatible descs')
+            }
+        } else if (isDataDescriptor(currentDesc) && isDataDescriptor(desc)) {
+            if (currentDesc.configurable === false) {
+                if (currentDesc.writable === false && desc.writable === true) {
+                    throw new TypeError('non-configurable, incompatible descs')
+                }
+                if (currentDesc.writable === false) {
+                    if ('value' in desc && !sameValue(desc.value, currentDesc.value)) {
+                        throw new TypeError('non-configurable, incompatible descs')
+                    }
+                }
+            }
+        } else if (isAccessorDescriptor(currentDesc) && isAccessorDescriptor(desc)) {
+            if (currentDesc.configurable === false) {
+                if ('set' in desc && !sameValue(desc.set, currentDesc.set)) {
+                    throw new TypeError('non-configurable, incompatible descs')
+                }
+                if ('get' in desc && !sameValue(desc.get, currentDesc.get)) {
+                    throw new TypeError('non-configurable, incompatible descs')
+                }
+            }
+        }
+        setOwnValue(target, name, desc.value);
         propDescMap.set(name, desc);
+        return true;
+    };
+
+    ObjectReplacement.defineProperties = function defineProperties(o, propDescs){
+        //console.log('new Object.defineProperties');
+        var desc;
+        for(var p in propDescs){
+            desc = propDescs[p];
+            ObjectReplacement.defineProperty(o, p, desc);
+        }
+
     };
 
     ObjectReplacement.getOwnPropertyDescriptor = function getOwnPropertyDescriptor(o, name){
         var target = proxyToTarget.get(o);
         if(!target)
             throw new Error("Unsupported object. Did you create it with 'new Object()'?");
-        var propDescMap = targetToPropDescMap.get(o);
+        var propDescMap = targetToPropDescMap.get(target);
 
         return propDescMap.has(name) ?
             propDescMap.get(name) :
@@ -161,19 +293,22 @@
     ObjectReplacement.preventExtensions = function preventExtensions(o){
         return notExtensibleObjects.add(o);
     };
+    ObjectReplacement.seal = ObjectReplacement.freeze = ObjectReplacement.preventExtensions;
+
     ObjectReplacement.isExtensible = function isExtensible(o){
         return !notExtensibleObjects.has(o);
     };
+    ObjectReplacement.isSealed = ObjectReplacement.isFrozen = ObjectReplacement.isExtensible;
 
     ObjectReplacement.keys = function keys(o){
         var target = proxyToTarget.get(o);
         if(!target)
             throw new Error("Unsupported object. Did you create it with 'new Object()'?");
-        var propDescMap = targetToPropDescMap.get(o);
+        var propDescMap = targetToPropDescMap.get(target);
 
         var ret = [];
 
-        for(var p of this.propDescMap){
+        for(var p of propDescMap){
             var propName = p[0]; // What sort of API is this???
             var desc = p[1];
             if(desc.enumerable === true)
@@ -203,4 +338,3 @@
     }
 
 })(this);
-

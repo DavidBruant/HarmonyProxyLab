@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <script type="text/javascript" src="../ES5ObjectModelEmul.js"> </script>
+
+    <script>
+
+        var testcase = wrapTestObject(function testcase() {
+            var proto = wrapTestObject({});
+            Object.defineProperty(proto, 'value', wrapTestObject({
+                get: wrapTestObject(function () {
+                    return 'inheritedAccessorProperty';
+                })
+            }));
+            var ConstructFun = wrapTestObject(function () {
+            });
+            ConstructFun.prototype = proto;
+            var descObj = wrapTestObject(new ConstructFun());
+            Object.defineProperty(descObj, 'value', wrapTestObject({
+                get: wrapTestObject(function () {
+                    return 'ownDataProperty';
+                })
+            }));
+            console.log('descObj.value', descObj.value);
+
+            var newObj = Object.create(wrapTestObject({}), wrapTestObject({ prop: descObj }));
+            return newObj.prop === 'ownDataProperty';
+        });
+        console.log(testcase())
+    </script>
+
+
+    <title> debug </title>
+
+</head>
+
+<body>
+</html>

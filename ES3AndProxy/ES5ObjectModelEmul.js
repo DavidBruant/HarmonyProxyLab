@@ -34,6 +34,7 @@
                 configurable: true,
                 writable: true
             });
+            //o[name] = val;
         };
     })();
 

@@ -7,27 +7,14 @@
 
     <script>
 
-        function testcase() {
-            var proto = wrapTestObject({});
-            Object.defineProperty(proto, 'value', {
-                get: function () {
-                    return 'inheritedAccessorProperty';
-                }
+        var testcase = wrapTestObject(function testcase() {
+            var boolObj = wrapTestObject(new Boolean(true));
+            boolObj.get = wrapTestObject(function () {
+                return 'VerifyBooleanObject';
             });
-            var ConstructFun = function () {
-            };
-            ConstructFun.prototype = proto;
-            var descObj = wrapTestObject(new ConstructFun());
-            Object.defineProperty(descObj, 'value', {
-                get: function () {
-                    return 'ownDataProperty';
-                }
-            });
-            console.log('descObj.value', descObj.value);
-
-            var newObj = Object.create(wrapTestObject({}), wrapTestObject({ prop: descObj }));
-            return newObj.prop === 'ownDataProperty';
-        }
+            var newObj = Object.create(wrapTestObject({}), wrapTestObject({ prop: boolObj }));
+            return newObj.prop === 'VerifyBooleanObject';
+        });
         console.log(testcase())
     </script>
 

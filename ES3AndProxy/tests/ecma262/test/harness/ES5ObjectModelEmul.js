@@ -28,12 +28,13 @@
         var defProp = Object.defineProperty;
 
         return function setOwnValue(o, name, val){
-            return defProp(o, name, {
+            defProp(o, name, {
                 value: val,
+                writable: true,
                 enumerable: true,
-                configurable: true,
-                writable: true
+                configurable: true
             });
+            o[name] = val; // circumvanting a debugger (and engine?) bug
         };
     })();
 
@@ -41,7 +42,7 @@
     // removing native capabilities. Can't call traps after that
     delete Object.defineProperty;
     delete Object.defineProperties;
-    delete Object.getOwnPropertyDescriptor;
+    //delete Object.getOwnPropertyDescriptor;
     delete Object.keys;
     delete Object.seal;
     delete Object.freeze;
@@ -54,7 +55,7 @@
     var proxyToTarget = new WeakMap();
     var targetToProxy = new WeakMap();
     var notExtensibleObjects = new Set(); // ought to be a WeakSet...
-    //var proxyToHandler = new WeakMap();
+    //var proxyToHandler = new WeakMap();gopd
 
     // copied from http://wiki.ecmascript.org/doku.php?id=harmony:egal
     function sameValue(x, y) {
@@ -106,7 +107,7 @@
 
     var es5ObjectHandler =  {
         get: function(target, name, receiver){
-            receiver = receiver || target;
+            // receiver = receiver || target;
 
             var propDescMap = targetToPropDescMap.get(target);
             if(!propDescMap)
@@ -132,13 +133,81 @@
         },
         set: function(target, name, value, receiver){
             //console.log('set trap', Array.prototype.slice.call(arguments, 0));
+            // receiver = receiver || target;
+            var newDesc;
+            var propDescMap = targetToPropDescMap.get(target);
+            if(!propDescMap)
+                throw new Error("Unsupported object. Did you create it with 'new Object()'?");
 
-            if(! (name in target) && notExtensibleObjects.has(receiver))
-                throw new TypeError("Can't add a property to a non-extensible object")
+            // first, check whether target has a non-writable property
+            // shadowing name on receiver
+            var ownDesc = propDescMap.get(name);
 
-            setOwnValue(target, name, value);
+            if (ownDesc !== undefined) {
+                if (isAccessorDescriptor(ownDesc)) {
+                    var setter = ownDesc.set;
+                    if (setter === undefined) return false;
+                    setter.call(receiver, value); // assumes Function.prototype.call
+                    return true;
+                }
+                // otherwise, isDataDescriptor(ownDesc) must be true
+                if (ownDesc.writable === false) return false;
+                // we found an existing writable data property on the prototype chain.
+                // Now update or add the data property on the receiver, depending on
+                // whether the receiver already defines the property or not.
+                var existingDesc = Object.getOwnPropertyDescriptor(receiver, name);
+                if (existingDesc !== undefined) {
+                    var updateDesc = {
+                        value: value,
+                        // FIXME: it should not be necessary to describe the following
+                        // attributes. Added to circumvent a bug in tracemonkey:
+                        // https://bugzilla.mozilla.org/show_bug.cgi?id=601329
+                        writable: existingDesc.writable,
+                        enumerable: existingDesc.enumerable,
+                        configurable: existingDesc.configurable
+                    };
 
-            // if(this.extensible) SetOwnValue(target or receiver?, name, value);
+                    var receiverTarget = proxyToTarget.get(receiver) || receiver;
+                    var receiverPropDescMap = targetToPropDescMap.get(receiverTarget);
+                    receiverPropDescMap.set(name, updateDesc);
+                    receiverTarget[name] = updateDesc.value;
+                    return true;
+                } else {
+                    if (!Object.isExtensible(receiver)) return false;
+                    newDesc = {
+                        value: value,
+                        writable: true,
+                        enumerable: true,
+                        configurable: true
+                    };
+
+                    var receiverTarget = proxyToTarget.get(receiver) || receiver;
+                    var receiverPropDescMap = targetToPropDescMap.get(receiverTarget);
+                    receiverPropDescMap.set(name, newDesc);
+                    receiverTarget[name] = newDesc.value;
+
+                    return true;
+                }
+            }
+
+            // name is not defined in target, search target's prototype
+            var proto = ObjectReplacement.getPrototypeOf(target);
+            if (proto === null) {
+                // target was the last prototype, now we know that 'name' is not shadowed
+                // by an existing (accessor or data) property, so we can add the property
+                // to the initial receiver object
+                if (!Object.isExtensible(receiver)) return false;
+                newDesc = {
+                    value: value,
+                    writable: true,
+                    enumerable: true,
+                    configurable: true
+                };
+                Object.defineProperty(receiver, name, newDesc);
+                return true;
+            }
+            // continue the search in target's prototype
+            return this.set(proto, name, value, receiver);
         },
         delete: function(target, name){
             var target = proxyToTarget.get(o);
@@ -199,13 +268,15 @@
         return makeEmulated(Object.getPrototypeOf(o)); // some identity issues, but whatever?
     };
     ObjectReplacement.create = function(proto, propMap){
-        return makeEmulated(Object.create(proto, propMap));
+        var ret = makeEmulated(Object.create(proto));
+        ObjectReplacement.defineProperties(ret, propMap);
+        return ret;
     };
     ObjectReplacement.makeEmulated = makeEmulated;
 
 
     ObjectReplacement.defineProperty = function defineProperty(o, name, desc){
-        console.log('new Object.defineProperty');
+        //console.log('new Object.defineProperty');
         var target = proxyToTarget.get(o);
         if(!target)
             throw new Error("Unsupported object. Did you create it with 'new Object()'?");

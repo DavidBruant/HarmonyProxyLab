@@ -207,6 +207,7 @@
                 return true;
             }
             // continue the search in target's prototype
+            proto = proxyToTarget.get(proto) || proto;
             return this.set(proto, name, value, receiver);
         },
         delete: function(target, name){
@@ -248,7 +249,7 @@
             targetToProxy.set(target, p);
             var propDescMap = new Map();
             Object.getOwnPropertyNames(target).forEach(function(name){
-                propDescMap.set(name, {value: target[name], configurable: true, writable: true, enumerable: true});
+                propDescMap.set(name, Object.getOwnPropertyDescriptor(target, name));
             });
 
             targetToPropDescMap.set(target, propDescMap); // this map could as well be an object

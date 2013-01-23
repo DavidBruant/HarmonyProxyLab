@@ -8,15 +8,15 @@
     <script>
 
         function testcase() {
-            var strObj = wrapTestObject(new String());
-            var data = 'data';
-            strObj.set = function (value) {
-                data = value;
-            };
-            var newObj = Object.create({}, { prop: strObj });
-            var hasProperty = newObj.hasOwnProperty('prop');
-            newObj.prop = 'overrideData';
-            return hasProperty && data === 'overrideData';
+            var props = wrapTestObject({});
+            Object.defineProperty(props, 'prop', {
+                get: function () {
+                    return {};
+                },
+                enumerable: false
+            });
+            var newObj = Object.create({}, props);
+            return !newObj.hasOwnProperty('prop');
         }
         console.log(testcase())
     </script>

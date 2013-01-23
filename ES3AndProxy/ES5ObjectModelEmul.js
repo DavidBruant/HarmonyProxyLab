@@ -184,7 +184,7 @@
                     };
 
                     receiverPropDescMap.set(name, newDesc);
-                    receiverTarget[name] = newDesc.value;
+                    setOwnValue(receiverTarget, name, value);
 
                     return true;
                 }
@@ -203,7 +203,8 @@
                     enumerable: true,
                     configurable: true
                 };
-                receiverPropDescMap.set(name, newDesc)
+                receiverPropDescMap.set(name, newDesc);
+                setOwnValue(receiverTarget, name, value);
                 return true;
             }
             // continue the search in target's prototype
@@ -228,22 +229,22 @@
     function makeEmulated(target){
         //console.log('makeEmulated')
         if(Object(target) !== target){ // primitive values
-            console.log('makeEmulated primitive', typeof target);
+            //console.log('makeEmulated primitive', typeof target);
             return target;
         }
 
         if(isEmulatedObject(target)){
-            console.log('makeEmulated true');
+            //console.log('makeEmulated true');
             return target;
         }
 
         var existingProxy = targetToProxy.get(target);
         if(existingProxy){
-            console.log('makeEmulated existing proxy');
+            //console.log('makeEmulated existing proxy');
             return existingProxy;
         }
         else{
-            console.log('makeEmulated new');
+            //console.log('makeEmulated new');
             var p = new Proxy(target, es5ObjectHandler);
             proxyToTarget.set(p, target);
             targetToProxy.set(target, p);

@@ -184,7 +184,7 @@
                     };
 
                     receiverPropDescMap.set(name, newDesc);
-                    receiverTarget[name] = newDesc.value;
+                    setOwnValue(receiverTarget, name, value);
 
                     return true;
                 }
@@ -203,7 +203,8 @@
                     enumerable: true,
                     configurable: true
                 };
-                receiverPropDescMap.set(name, newDesc)
+                receiverPropDescMap.set(name, newDesc);
+                setOwnValue(receiverTarget, name, value);
                 return true;
             }
             // continue the search in target's prototype

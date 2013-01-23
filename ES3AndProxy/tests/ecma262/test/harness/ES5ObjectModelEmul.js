@@ -55,6 +55,8 @@
     var proxyToTarget = new WeakMap();
     var targetToProxy = new WeakMap();
     var notExtensibleObjects = new Set(); // ought to be a WeakSet...
+    var isNotExtensible = notExtensibleObjects.has.bind(notExtensibleObjects);
+
     //var proxyToHandler = new WeakMap();gopd
 
     // copied from http://wiki.ecmascript.org/doku.php?id=harmony:egal
@@ -139,6 +141,8 @@
             if(!propDescMap)
                 throw new Error("Unsupported object. Did you create it with 'new Object()'?");
 
+            var receiverTarget = proxyToTarget.get(receiver) || receiver;
+            var receiverPropDescMap = targetToPropDescMap.get(receiverTarget);
             // first, check whether target has a non-writable property
             // shadowing name on receiver
             var ownDesc = propDescMap.get(name);
@@ -167,13 +171,11 @@
                         configurable: existingDesc.configurable
                     };
 
-                    var receiverTarget = proxyToTarget.get(receiver) || receiver;
-                    var receiverPropDescMap = targetToPropDescMap.get(receiverTarget);
                     receiverPropDescMap.set(name, updateDesc);
                     receiverTarget[name] = updateDesc.value;
                     return true;
                 } else {
-                    if (!Object.isExtensible(receiver)) return false;
+                    if (!isNotExtensible(receiverTarget)) return false;
                     newDesc = {
                         value: value,
                         writable: true,
@@ -181,8 +183,6 @@
                         configurable: true
                     };
 
-                    var receiverTarget = proxyToTarget.get(receiver) || receiver;
-                    var receiverPropDescMap = targetToPropDescMap.get(receiverTarget);
                     receiverPropDescMap.set(name, newDesc);
                     receiverTarget[name] = newDesc.value;
 
@@ -196,14 +196,14 @@
                 // target was the last prototype, now we know that 'name' is not shadowed
                 // by an existing (accessor or data) property, so we can add the property
                 // to the initial receiver object
-                if (!Object.isExtensible(receiver)) return false;
+                if (isNotExtensible(receiverTarget)) return false;
                 newDesc = {
                     value: value,
                     writable: true,
                     enumerable: true,
                     configurable: true
                 };
-                Object.defineProperty(receiver, name, newDesc);
+                receiverPropDescMap.set(name, newDesc)
                 return true;
             }
             // continue the search in target's prototype
@@ -363,12 +363,18 @@
     };
 
     ObjectReplacement.preventExtensions = function preventExtensions(o){
-        return notExtensibleObjects.add(o);
+        var target = proxyToTarget.get(o);
+        if(!target)
+          throw new Error("Unsupported object. Did you create it with 'new Object()'?");
+        return notExtensibleObjects.add(target);
     };
     ObjectReplacement.seal = ObjectReplacement.freeze = ObjectReplacement.preventExtensions;
 
     ObjectReplacement.isExtensible = function isExtensible(o){
-        return !notExtensibleObjects.has(o);
+        var target = proxyToTarget.get(o);
+        if(!target)
+            throw new Error("Unsupported object. Did you create it with 'new Object()'?");
+        return !notExtensibleObjects.has(target);
     };
     ObjectReplacement.isSealed = ObjectReplacement.isFrozen = ObjectReplacement.isExtensible;
 

@@ -7,14 +7,17 @@
 
     <script>
 
-        var testcase = wrapTestObject(function testcase() {
-            var boolObj = wrapTestObject(new Boolean(true));
-            boolObj.get = wrapTestObject(function () {
-                return 'VerifyBooleanObject';
-            });
-            var newObj = Object.create(wrapTestObject({}), wrapTestObject({ prop: boolObj }));
-            return newObj.prop === 'VerifyBooleanObject';
-        });
+        function testcase() {
+            var strObj = wrapTestObject(new String());
+            var data = 'data';
+            strObj.set = function (value) {
+                data = value;
+            };
+            var newObj = Object.create({}, { prop: strObj });
+            var hasProperty = newObj.hasOwnProperty('prop');
+            newObj.prop = 'overrideData';
+            return hasProperty && data === 'overrideData';
+        }
         console.log(testcase())
     </script>
 

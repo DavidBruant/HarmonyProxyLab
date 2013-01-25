@@ -59,20 +59,46 @@
 
     //var proxyToHandler = new WeakMap();gopd
 
-    // copied from http://wiki.ecmascript.org/doku.php?id=harmony:egal
-    function sameValue(x, y) {
-        if (x === y) {
-            // 0 === -0, but they are not identical
-            return x !== 0 || 1 / x === 1 / y;
-        }
-
-        // NaN !== NaN, but they are identical.
-        // NaNs are the only non-reflexive value, i.e., if x !== x,
-        // then x is a NaN.
-        // isNaN is broken: it converts its argument to number, so
-        // isNaN("foo") => true
-        return x !== x && y !== y;
+    function isStandardAttribute(name) {
+        return /^(get|set|value|writable|enumerable|configurable)$/.test(name);
     }
+
+// Adapted from ES5 section 8.10.5
+    function toPropertyDescriptor(obj) {
+        if (Object(obj) !== obj) {
+            throw new TypeError("property descriptor should be an Object, given: "+
+                obj);
+        }
+        var desc = {};
+        if ('enumerable' in obj) { desc.enumerable = !!obj.enumerable; }
+        if ('configurable' in obj) { desc.configurable = !!obj.configurable; }
+        if ('value' in obj) { desc.value = obj.value; }
+        if ('writable' in obj) { desc.writable = !!obj.writable; }
+        if ('get' in obj) {
+            var getter = obj.get;
+            if (getter !== undefined && typeof getter !== "function") {
+                throw new TypeError("property descriptor 'get' attribute must be "+
+                    "callable or undefined, given: "+getter);
+            }
+            desc.get = getter;
+        }
+        if ('set' in obj) {
+            var setter = obj.set;
+            if (setter !== undefined && typeof setter !== "function") {
+                throw new TypeError("property descriptor 'set' attribute must be "+
+                    "callable or undefined, given: "+setter);
+            }
+            desc.set = setter;
+        }
+        if ('get' in desc || 'set' in desc) {
+            if ('value' in desc || 'writable' in desc) {
+                throw new TypeError("property descriptor cannot be both a data and an "+
+                    "accessor descriptor: "+obj);
+            }
+        }
+        return desc;
+    }
+
     function isAccessorDescriptor(desc) {
         if (desc === undefined) return false;
         return ('get' in desc || 'set' in desc);
@@ -85,6 +111,21 @@
         if (desc === undefined) return false;
         return !isAccessorDescriptor(desc) && !isDataDescriptor(desc);
     }
+
+    function toCompletePropertyDescriptor(desc) {
+        var internalDesc = toPropertyDescriptor(desc);
+        if (isGenericDescriptor(internalDesc) || isDataDescriptor(internalDesc)) {
+            if (!('value' in internalDesc)) { internalDesc.value = undefined; }
+            if (!('writable' in internalDesc)) { internalDesc.writable = false; }
+        } else {
+            if (!('get' in internalDesc)) { internalDesc.get = undefined; }
+            if (!('set' in internalDesc)) { internalDesc.set = undefined; }
+        }
+        if (!('enumerable' in internalDesc)) { internalDesc.enumerable = false; }
+        if (!('configurable' in internalDesc)) { internalDesc.configurable = false; }
+        return internalDesc;
+    }
+
     function isEmptyDescriptor(desc) {
         return !('get' in desc) &&
             !('set' in desc) &&
@@ -103,7 +144,69 @@
             sameValue(desc1.configurable, desc2.configurable);
     }
 
+// copied from http://wiki.ecmascript.org/doku.php?id=harmony:egal
+    function sameValue(x, y) {
+        if (x === y) {
+            // 0 === -0, but they are not identical
+            return x !== 0 || 1 / x === 1 / y;
+        }
 
+        // NaN !== NaN, but they are identical.
+        // NaNs are the only non-reflexive value, i.e., if x !== x,
+        // then x is a NaN.
+        // isNaN is broken: it converts its argument to number, so
+        // isNaN("foo") => true
+        return x !== x && y !== y;
+    }
+
+    /**
+     * Returns a fresh property descriptor that is guaranteed
+     * to be complete (i.e. contain all the standard attributes).
+     * Additionally, any non-standard enumerable properties of
+     * attributes are copied over to the fresh descriptor.
+     *
+     * If attributes is undefined, returns undefined.
+     *
+     * See also: http://wiki.ecmascript.org/doku.php?id=harmony:proxies_semantics
+     */
+    function normalizeAndCompletePropertyDescriptor(attributes) {
+        if (attributes === undefined) { return undefined; }
+        var desc = toCompletePropertyDescriptor(attributes);
+        // Note: no need to call FromPropertyDescriptor(desc), as we represent
+        // "internal" property descriptors as proper Objects from the start
+        for (var name in attributes) {
+            if (!isStandardAttribute(name)) {
+                setOwnValue(desc, name, attributes[name]);
+            }
+        }
+        return desc;
+    }
+
+    /**
+     * Returns a fresh property descriptor whose standard
+     * attributes are guaranteed to be data properties of the right type.
+     * Additionally, any non-standard enumerable properties of
+     * attributes are copied over to the fresh descriptor.
+     *
+     * If attributes is undefined, will throw a TypeError.
+     *
+     * See also: http://wiki.ecmascript.org/doku.php?id=harmony:proxies_semantics
+     */
+    function normalizePropertyDescriptor(attributes) {
+        var desc = toPropertyDescriptor(attributes);
+        // Note: no need to call FromGenericPropertyDescriptor(desc), as we represent
+        // "internal" property descriptors as proper Objects from the start
+        for (var name in attributes) {
+            if (!isStandardAttribute(name)) {
+                setOwnValue(desc, name, attributes[name]);
+            }
+        }
+        return desc;
+    }
+
+    function getEmulatedPrototypeOfAndMakeEmulated(o){
+        return makeEmulated(Object.getPrototypeOf(o));
+    }
 
     var isEmulatedObject = proxyToTarget.has.bind(proxyToTarget);
 
@@ -117,7 +220,7 @@
             var desc = propDescMap.get(name);
 
             if (desc === undefined) {
-                var proto = ObjectReplacement.getPrototypeOf(target);
+                var proto = getEmulatedPrototypeOfAndMakeEmulated(target);
                 if (proto === null) {
                     return undefined;
                 }
@@ -191,7 +294,7 @@
             }
 
             // name is not defined in target, search target's prototype
-            var proto = ObjectReplacement.getPrototypeOf(target);
+            var proto = getEmulatedPrototypeOfAndMakeEmulated(target);
             if (proto === null) {
                 // target was the last prototype, now we know that 'name' is not shadowed
                 // by an existing (accessor or data) property, so we can add the property
@@ -211,18 +314,47 @@
             proto = proxyToTarget.get(proto) || proto;
             return this.set(proto, name, value, receiver);
         },
-        delete: function(target, name){
-            var target = proxyToTarget.get(o);
-            if(!target)
-                throw new Error("Unsupported object. Did you create it with 'new Object()'?");
+        deleteProperty: function(target, name){
             var propDescMap = targetToPropDescMap.get(target);
+            if(!propDescMap)
+                throw new Error("Unsupported object. Did you create it with 'new Object()'?");
             var desc = propDescMap.get(name);
 
             if(desc && desc.configurable === false){
-                throw new Error(['Property', name, 'is not configurable, so it cannot be deleted'].join(' '))
+                return false; // caller strictmode-ness will decide whether this should throw
             }
-            propDescMap.remove(name);
+            propDescMap.delete(name);
             return delete target[name];
+        },
+        enumerate: function(target){
+            // I need the enumerate trap to implement for-in loops looking at propDescs myself
+            console.log('enumerate');
+
+            var props = [];
+            var propDescMap = targetToPropDescMap.get(target);
+            if(!propDescMap)
+                throw new Error("Unsupported object. Did you create it with 'new Object()'?");
+            var desc;
+            for(var p in target){
+                if(Object.prototype.hasOwnProperty.call(target, p)){
+                    desc = propDescMap.get(p);
+                    if(desc.enumerable)
+                        props.push(p);
+                }
+                else
+                    props.push(p);
+
+            }
+
+            return {
+                next: function(){
+                    if(props.length)
+                        return props.shift(0, 1);
+                    else
+                        throw StopIteration;
+                }
+            }
+
         }
     };
 
@@ -266,9 +398,8 @@
     }
 
     ObjectReplacement.prototype = Object.prototype;
-    ObjectReplacement.getPrototypeOf = function getPrototypeOf(o){
-        return makeEmulated(Object.getPrototypeOf(o)); // some identity issues, but whatever?
-    };
+    ObjectReplacement.getPrototypeOf = Object.getPrototypeOf;
+
     ObjectReplacement.create = function(proto, propMap){
         var ret = makeEmulated(Object.create(proto));
         ObjectReplacement.defineProperties(ret, propMap);
@@ -289,6 +420,9 @@
         if (currentDesc === undefined && extensible === false) {
             throw new TypeError('non-extensible')
         }
+
+        desc = normalizeAndCompletePropertyDescriptor(desc);
+
         if (currentDesc === undefined && extensible === true) {
             setOwnValue(target, name, desc.value);
             propDescMap.set(name, desc);

@@ -58,9 +58,9 @@
     var isNotExtensible = notExtensibleObjects.has.bind(notExtensibleObjects);
 
     //var proxyToHandler = new WeakMap();gopd
-
-    function isStandardAttribute(name) {
-        return /^(get|set|value|writable|enumerable|configurable)$/.test(name);
+    var StandardAttributeSet = new Set(['get', 'set', 'value', 'writable', 'enumerable', 'configurable']);
+    function isStandardAttributeSet(name){
+        return !StandardAttributeSet.has(name);
     }
 
 // Adapted from ES5 section 8.10.5
@@ -421,6 +421,13 @@
             throw new TypeError('non-extensible')
         }
 
+
+        /* starting here, things are slow (slower than Firefox. Aaaaaaaaah)
+            Ideas to make faster
+            use maps for property descriptors
+            // http://jsperf.com/map-has-vs-in-operator
+            // jsperf.com/a-set
+         */
         desc = normalizeAndCompletePropertyDescriptor(desc);
 
         if (currentDesc === undefined && extensible === true) {

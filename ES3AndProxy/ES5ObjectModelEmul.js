@@ -459,6 +459,24 @@
 
     };
 
+    function propDescCopy(desc){
+        var copy = {};
+
+        if('value' in desc){
+            copy.value = desc.value;
+            copy.writable = desc.writable;
+        }
+        else{
+            copy.get = desc.get;
+            copy.set = desc.set;
+        }
+
+        copy.configurable = desc.configurable;
+        copy.enumerable = desc.enumerable;
+
+        return copy;
+    }
+
     ObjectReplacement.getOwnPropertyDescriptor = function getOwnPropertyDescriptor(o, name){
         var target = proxyToTarget.get(o);
         if(!target)
@@ -466,13 +484,8 @@
         var propDescMap = targetToPropDescMap.get(target);
 
         return propDescMap.has(name) ?
-            propDescMap.get(name) :
-        {
-            value:o[name], // would be faster if applied to the target directly instead of the proxy, but would require a proxy -> target lookup
-            configurable: true,
-            enumerable: true,
-            writable: true
-        };
+            propDescCopy(propDescMap.get(name)) :
+            undefined;
     };
 
     ObjectReplacement.preventExtensions = function preventExtensions(o){

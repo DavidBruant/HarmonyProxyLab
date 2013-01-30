@@ -6,17 +6,14 @@
     <script type="text/javascript" src="../ES5ObjectModelEmul.js"> </script>
 
     <script>
-        function testcase() {
-            var props = wrapTestObject({});
-            Object.defineProperty(props, 'prop', {
-                get: function () {
-                    return {};
-                },
-                enumerable: false
+        var testcase = wrapTestObject(function testcase() {
+            var boolObj = wrapTestObject(new Boolean(true));
+            boolObj.get = wrapTestObject(function () {
+                return 'VerifyBooleanObject';
             });
-            var newObj = Object.create({}, props);
-            return !newObj.hasOwnProperty('prop');
-        }
+            var newObj = Object.create(wrapTestObject({}), wrapTestObject({ prop: boolObj }));
+            return newObj.prop === 'VerifyBooleanObject';
+        });
         console.log(testcase())
     </script>
 

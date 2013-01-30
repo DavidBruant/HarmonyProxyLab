@@ -381,7 +381,7 @@
 
         // toCompletePropertyDescriptor:
         // final property descriptor
-        var desc = Object.create(null);
+        var desc = {};
 
         var get = attributes.get;
         if(typeof get !== 'function' && get !== undefined)
@@ -395,17 +395,17 @@
             // accessor case
             if('value' in attributes || 'writable' in attributes)
                 throw new TypeError('Inconsistent property descriptor');
-            desc.get = get;
-            desc.set = set;
+            desc.get = 'get' in attributes || !currentDesc ? attributes.get : currentDesc.get;
+            desc.set = 'set' in attributes || !currentDesc ? attributes.set : currentDesc.set;
         }
         else{
             // data property case
-            desc.value = attributes.value;
-            desc.writable = !!attributes.writable;
+            desc.value = 'value' in attributes || !currentDesc ? attributes.value : currentDesc.value;
+            desc.writable = 'writable' in attributes || !currentDesc ? !!attributes.writable : currentDesc.writable;
         }
 
-        desc.configurable = !!attributes.configurable;
-        desc.enumerable = !!attributes.enumerable;
+        desc.configurable = 'configurable' in attributes || !currentDesc ? !!attributes.configurable : currentDesc.configurable;
+        desc.enumerable = 'enumerable' in attributes || !currentDesc ? !!attributes.enumerable : currentDesc.enumerable;
         // desc complete
 
         if (currentDesc === undefined && extensible === true) {

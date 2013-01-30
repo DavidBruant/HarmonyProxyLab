@@ -58,9 +58,12 @@
     var isNotExtensible = notExtensibleObjects.has.bind(notExtensibleObjects);
 
     //var proxyToHandler = new WeakMap();gopd
-    var StandardAttributeSet = new Set(['get', 'set', 'value', 'writable', 'enumerable', 'configurable']);
-    function isStandardAttributeSet(name){
+    /*var StandardAttributeSet = new Set(['get', 'set', 'value', 'writable', 'enumerable', 'configurable']);
+    function isStandardAttribute(name){
         return !StandardAttributeSet.has(name);
+    }*/
+    function isStandardAttribute(name) {
+        return /^(get|set|value|writable|enumerable|configurable)$/.test(name);
     }
 
 // Adapted from ES5 section 8.10.5
@@ -107,44 +110,19 @@
         if (desc === undefined) return false;
         return ('value' in desc || 'writable' in desc);
     }
-    function isGenericDescriptor(desc) {
-        if (desc === undefined) return false;
-        return !isAccessorDescriptor(desc) && !isDataDescriptor(desc);
-    }
 
-    function toCompletePropertyDescriptor(desc) {
-        var internalDesc = toPropertyDescriptor(desc);
-        if (isGenericDescriptor(internalDesc) || isDataDescriptor(internalDesc)) {
-            if (!('value' in internalDesc)) { internalDesc.value = undefined; }
-            if (!('writable' in internalDesc)) { internalDesc.writable = false; }
-        } else {
-            if (!('get' in internalDesc)) { internalDesc.get = undefined; }
-            if (!('set' in internalDesc)) { internalDesc.set = undefined; }
-        }
-        if (!('enumerable' in internalDesc)) { internalDesc.enumerable = false; }
-        if (!('configurable' in internalDesc)) { internalDesc.configurable = false; }
-        return internalDesc;
-    }
 
-    function isEmptyDescriptor(desc) {
-        return !('get' in desc) &&
-            !('set' in desc) &&
-            !('value' in desc) &&
-            !('writable' in desc) &&
-            !('enumerable' in desc) &&
-            !('configurable' in desc);
-    }
-
+    // only for internal usages
     function isEquivalentDescriptor(desc1, desc2) {
-        return sameValue(desc1.get, desc2.get) &&
-            sameValue(desc1.set, desc2.set) &&
+        return desc1.get === desc2.get &&
+            desc1.set === desc2.set &&
             sameValue(desc1.value, desc2.value) &&
-            sameValue(desc1.writable, desc2.writable) &&
-            sameValue(desc1.enumerable, desc2.enumerable) &&
-            sameValue(desc1.configurable, desc2.configurable);
+            desc1.writable === desc2.writable &&
+            desc1.enumerable === desc2.enumerable &&
+            desc1.configurable === desc2.configurable;
     }
 
-// copied from http://wiki.ecmascript.org/doku.php?id=harmony:egal
+    // copied from http://wiki.ecmascript.org/doku.php?id=harmony:egal
     function sameValue(x, y) {
         if (x === y) {
             // 0 === -0, but they are not identical
@@ -157,29 +135,6 @@
         // isNaN is broken: it converts its argument to number, so
         // isNaN("foo") => true
         return x !== x && y !== y;
-    }
-
-    /**
-     * Returns a fresh property descriptor that is guaranteed
-     * to be complete (i.e. contain all the standard attributes).
-     * Additionally, any non-standard enumerable properties of
-     * attributes are copied over to the fresh descriptor.
-     *
-     * If attributes is undefined, returns undefined.
-     *
-     * See also: http://wiki.ecmascript.org/doku.php?id=harmony:proxies_semantics
-     */
-    function normalizeAndCompletePropertyDescriptor(attributes) {
-        if (attributes === undefined) { return undefined; }
-        var desc = toCompletePropertyDescriptor(attributes);
-        // Note: no need to call FromPropertyDescriptor(desc), as we represent
-        // "internal" property descriptors as proper Objects from the start
-        for (var name in attributes) {
-            if (!isStandardAttribute(name)) {
-                setOwnValue(desc, name, attributes[name]);
-            }
-        }
-        return desc;
     }
 
     /**
@@ -408,7 +363,7 @@
     ObjectReplacement.makeEmulated = makeEmulated;
 
 
-    ObjectReplacement.defineProperty = function defineProperty(o, name, desc){
+    ObjectReplacement.defineProperty = function defineProperty(o, name, attributes){
         //console.log('new Object.defineProperty');
         var target = proxyToTarget.get(o);
         if(!target)
@@ -421,39 +376,54 @@
             throw new TypeError('non-extensible')
         }
 
+        if (attributes === undefined)
+            return undefined;
 
-        /* starting here, things are slow (slower than Firefox. Aaaaaaaaah)
-            Ideas to make faster
-            use maps for property descriptors
-            // http://jsperf.com/map-has-vs-in-operator
-            // jsperf.com/a-set
-         */
-        desc = normalizeAndCompletePropertyDescriptor(desc);
+        // toCompletePropertyDescriptor:
+        // final property descriptor
+        var desc = Object.create(null);
+
+        var get = attributes.get;
+        if(typeof get !== 'function' && get !== undefined)
+            throw new TypeError('get should be a callable or undefined');
+
+        var set = attributes.set;
+        if(typeof set !== 'function' && set !== undefined)
+            throw new TypeError('set should be a callable or undefined');
+
+        if(get !== undefined || set !== undefined){
+            // accessor case
+            if('value' in attributes || 'writable' in attributes)
+                throw new TypeError('Inconsistent property descriptor');
+            desc.get = get;
+            desc.set = set;
+        }
+        else{
+            // data property case
+            desc.value = attributes.value;
+            desc.writable = !!attributes.writable;
+        }
+
+        desc.configurable = !!attributes.configurable;
+        desc.enumerable = !!attributes.enumerable;
+        // desc complete
 
         if (currentDesc === undefined && extensible === true) {
             setOwnValue(target, name, desc.value);
             propDescMap.set(name, desc);
             return o;
         }
-        if (isEmptyDescriptor(desc) || isEquivalentDescriptor(currentDesc, desc)) {
+        if (isEquivalentDescriptor(currentDesc, desc)) {
             return o;
         }
         if (currentDesc.configurable === false) {
-            if (desc.configurable === true) {
-                throw new TypeError('non-configurable')
+            if (desc.configurable === true ||
+                desc.enumerable !== currentDesc.enumerable ||
+                'value' in desc !== 'value' in currentDesc){// 'value' in desc means "isDataPropDesc"
+                    throw new TypeError('non-configurable')
             }
-            if ('enumerable' in desc && desc.enumerable !== currentDesc.enumerable) {
-                throw new TypeError('non-configurable')
-            }
-        }
-        if (isGenericDescriptor(desc)) {
-            // no further validation necessary
-        } else if (isDataDescriptor(currentDesc) !== isDataDescriptor(desc)) {
-            if (currentDesc.configurable === false) {
-                throw new TypeError('non-configurable, incompatible descs')
-            }
-        } else if (isDataDescriptor(currentDesc) && isDataDescriptor(desc)) {
-            if (currentDesc.configurable === false) {
+            if('value' in desc){
+                // both are data props
                 if (currentDesc.writable === false && desc.writable === true) {
                     throw new TypeError('non-configurable, incompatible descs')
                 }
@@ -463,8 +433,8 @@
                     }
                 }
             }
-        } else if (isAccessorDescriptor(currentDesc) && isAccessorDescriptor(desc)) {
-            if (currentDesc.configurable === false) {
+            else{
+                // both are accessors
                 if ('set' in desc && !sameValue(desc.set, currentDesc.set)) {
                     throw new TypeError('non-configurable, incompatible descs')
                 }
@@ -473,9 +443,10 @@
                 }
             }
         }
+
         setOwnValue(target, name, desc.value);
         propDescMap.set(name, desc);
-        return true;
+        return o;
     };
 
     ObjectReplacement.defineProperties = function defineProperties(o, propDescs){
